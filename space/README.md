@@ -3,19 +3,19 @@ title: EgoSieve
 emoji: 🎞️
 colorFrom: gray
 colorTo: orange
-sdk: gradio
-sdk_version: 5.47.2
-python_version: 3.12
-app_file: app.py
-suggested_hardware: cpu-basic
+sdk: static
+app_file: index.html
 models:
   - itspublu/EgoSieve-S
 ---
 
-# EgoSieve
+# EgoSieve manifest inspector
 
-Upload a first-person video, inspect its manipulation-readiness timeline, and
-download the versioned evidence manifest. The Space does not retain uploads
-beyond the runtime's bounded temporary workspace. Set `EGOSIEVE_MODEL_ID` and
-`EGOSIEVE_MODEL_REVISION` to the released model repository and immutable commit
-before deployment; the app intentionally refuses an unresolved revision.
+Inspect a versioned EgoSieve JSONL manifest alongside an optional local video.
+The browser renders readiness curves, compiled segments, issue evidence, and
+recorded run metadata. Segment selections seek the local video, and the loaded
+manifest or a compact segment export can be downloaded for reuse.
+
+This is a dependency-free Static Space. Files are processed only in browser
+memory and are never uploaded. Model inference runs through the EgoSieve CLI;
+the Space is deliberately an inspector, not an inference service.

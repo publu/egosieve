@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' blob:; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    >
+    <meta
+      name="description"
+      content="Inspect EgoSieve video-readiness manifests locally in your browser."
+    >
+    <title>EgoSieve — Manifest Inspector</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to inspector</a>
+
+    <header class="masthead">
+      <a class="wordmark" href="#top" aria-label="EgoSieve home">
+        <span class="wordmark-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>EGO/SIEVE</span>
+      </a>
+      <div class="masthead-status">
+        <span class="status-lamp" aria-hidden="true"></span>
+        LOCAL EVIDENCE CONSOLE
+      </div>
+      <a class="masthead-link" href="https://huggingface.co/itspublu/EgoSieve-S">MODEL CARD ↗</a>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-index" aria-hidden="true">INSPECTOR / 01</div>
+        <div class="hero-copy">
+          <p class="eyebrow"><span>VIDEO READINESS</span> / MANIFEST WORKBENCH</p>
+          <h1 id="hero-title">READ THE<br><em>USEFUL</em> SECONDS.</h1>
+          <p class="hero-deck">
+            Open an EgoSieve evidence manifest. Trace each routing decision, audit observable
+            failure signals, and jump straight to the corresponding moment in your local video.
+          </p>
+        </div>
+        <div class="hero-stamp" aria-label="Private by design">
+          <span>PRIVATE</span>
+          <strong>BY<br>DESIGN</strong>
+          <small>NO FILE TRANSFER</small>
+        </div>
+      </section>
+
+      <section class="load-bay" aria-labelledby="load-title">
+        <div class="section-heading">
+          <span class="section-number">01</span>
+          <div>
+            <p class="eyebrow">SOURCE MATERIAL</p>
+            <h2 id="load-title">Open evidence</h2>
+          </div>
+          <p class="section-note">Both files stay in this browser tab. The video is optional.</p>
+        </div>
+
+        <div class="file-grid">
+          <label class="file-bay manifest-bay" id="manifest-drop">
+            <input id="manifest-input" type="file" accept=".jsonl,.ndjson,application/x-ndjson,application/json">
+            <span class="file-number">A</span>
+            <span class="file-icon" aria-hidden="true">↳</span>
+            <strong>EgoSieve manifest</strong>
+            <span id="manifest-file-name">Drop JSONL here or choose a file</span>
+            <small>Required · schema v1 · maximum 32 MB</small>
+          </label>
+
+          <label class="file-bay video-bay" id="video-drop">
+            <input id="video-input" type="file" accept="video/*">
+            <span class="file-number">B</span>
+            <span class="file-icon" aria-hidden="true">▷</span>
+            <strong>Matching local video</strong>
+            <span id="video-file-name">Drop video here or choose a file</span>
+            <small>Optional · used only for playback and seeking</small>
+          </label>
+        </div>
+
+        <div class="load-actions">
+          <button class="button button-primary" id="demo-button" type="button">Load example evidence</button>
+          <button class="button button-quiet" id="reset-button" type="button">Reset workspace</button>
+          <div class="privacy-note">
+            <span aria-hidden="true">◉</span>
+            Processing is local. This page has no network connection.
+          </div>
+        </div>
+        <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section class="cli-band" aria-labelledby="cli-title">
+        <div class="cli-label">
+          <span class="section-number">02</span>
+          <div>
+            <p class="eyebrow">CREATE A MANIFEST</p>
+            <h2 id="cli-title">Inference runs in the CLI</h2>
+          </div>
+        </div>
+        <p>
+          This static inspector does not run the model. Scan a video on your machine, then open
+          the resulting JSONL here.
+        </p>
+        <div class="command-shell">
+          <span class="prompt" aria-hidden="true">$</span>
+          <code id="cli-command">egosieve scan INPUT_VIDEO --model itspublu/EgoSieve-S --revision MODEL_COMMIT --output OUTPUT.egosieve.jsonl</code>
+          <button class="copy-button" id="copy-cli" type="button" aria-label="Copy CLI command">COPY</button>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace" aria-labelledby="workspace-title" hidden>
+        <div class="section-heading workspace-heading">
+          <span class="section-number">03</span>
+          <div>
+            <p class="eyebrow">EVIDENCE LOADED</p>
+            <h2 id="workspace-title">Inspection desk</h2>
+          </div>
+          <div class="manifest-identity">
+            <strong id="identity-file">—</strong>
+            <span id="identity-model">—</span>
+          </div>
+        </div>
+
+        <div class="metric-grid" aria-label="Manifest summary">
+          <article class="metric-card metric-acid">
+            <span>Source duration</span>
+            <strong id="metric-duration">—</strong>
+            <small id="metric-geometry">—</small>
+          </article>
+          <article class="metric-card">
+            <span>Sampled windows</span>
+            <strong id="metric-windows">—</strong>
+            <small id="metric-window-mix">—</small>
+          </article>
+          <article class="metric-card">
+            <span>Compiled segments</span>
+            <strong id="metric-segments">—</strong>
+            <small>exclusive routed spans</small>
+          </article>
+          <article class="metric-card metric-orange">
+            <span>Keep time</span>
+            <strong id="metric-keep">—</strong>
+            <small id="metric-review">—</small>
+          </article>
+        </div>
+
+        <div class="warning-stack" id="warning-stack" aria-live="polite" hidden></div>
+
+        <div class="analysis-grid">
+          <article class="panel media-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-index">A / LOCAL MEDIA</span>
+                <h3>Source monitor</h3>
+              </div>
+              <span class="panel-state" id="video-state">NO VIDEO</span>
+            </div>
+            <div class="video-stage" id="video-stage">
+              <video
+                id="video"
+                controls
+                preload="metadata"
+                playsinline
+                aria-label="Local video matched to the manifest"
+                hidden
+              ></video>
+              <div class="video-empty" id="video-empty">
+                <span aria-hidden="true">B</span>
+                <strong>Video is optional</strong>
+                <p>Open the matching local file above to enable timecode seeking.</p>
+              </div>
+              <div class="video-timecode" id="video-timecode" hidden>00:00.0</div>
+            </div>
+            <p class="media-footnote" id="media-footnote">
+              Segment selections still work without media; their timestamps remain inspectable.
+            </p>
+          </article>
+
+          <article class="panel timeline-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-index">B / MODEL OUTPUT</span>
+                <h3>Readiness trace</h3>
+              </div>
+              <div class="legend" aria-label="Readiness legend">
+                <span class="legend-keep">KEEP</span>
+                <span class="legend-review">REVIEW</span>
+                <span class="legend-reject">REJECT</span>
+              </div>
+            </div>
+            <div class="timeline-stage" id="timeline-stage">
+              <svg
+                id="timeline"
+                viewBox="0 0 1000 360"
+                role="img"
+                aria-labelledby="timeline-title timeline-description"
+                preserveAspectRatio="none"
+              >
+                <title id="timeline-title">Readiness probabilities over time</title>
+                <desc id="timeline-description">Load a manifest to view the readiness trace.</desc>
+              </svg>
+              <div class="chart-tooltip" id="chart-tooltip" role="status" hidden></div>
+            </div>
+            <div class="segment-track" id="segment-track" aria-label="Clickable compiled segment timeline"></div>
+            <div class="timeline-axis">
+              <span>00:00</span>
+              <span id="timeline-end">END</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="evidence-grid">
+          <article class="panel segments-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-index">C / ROUTING</span>
+                <h3>Compiled segments</h3>
+              </div>
+              <div class="route-filters" aria-label="Filter segments">
+                <button type="button" data-route="all" aria-pressed="true">ALL</button>
+                <button type="button" data-route="keep" aria-pressed="false">KEEP</button>
+                <button type="button" data-route="review" aria-pressed="false">REVIEW</button>
+                <button type="button" data-route="discard" aria-pressed="false">REJECT</button>
+              </div>
+            </div>
+            <div class="segment-list" id="segment-list"></div>
+          </article>
+
+          <aside class="panel issue-panel" aria-labelledby="issues-title">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-index">D / OBSERVABLE SIGNALS</span>
+                <h3 id="issues-title">Issue evidence</h3>
+              </div>
+              <span class="panel-state">MAX / MEAN</span>
+            </div>
+            <p class="issue-deck">Probabilities are model evidence, not verified ground truth.</p>
+            <div class="issue-list" id="issue-list"></div>
+          </aside>
+        </div>
+
+        <article class="panel selected-panel" id="selected-panel" hidden>
+          <div class="panel-heading">
+            <div>
+              <span class="panel-index">SELECTED EVIDENCE</span>
+              <h3 id="selected-title">Segment</h3>
+            </div>
+            <button class="copy-button dark" id="copy-segment" type="button">COPY JSON</button>
+          </div>
+          <div class="selected-grid">
+            <div class="selected-decision">
+              <span id="selected-route">KEEP</span>
+              <strong id="selected-time">00:00.0 → 00:06.0</strong>
+              <small id="selected-reason">stable</small>
+            </div>
+            <dl class="selected-scores" id="selected-scores"></dl>
+            <div class="selected-issues" id="selected-issues"></div>
+          </div>
+        </article>
+
+        <details class="metadata-drawer">
+          <summary>
+            <span><b>04</b> Run identity &amp; recorded policy</span>
+            <small>inspect raw header</small>
+          </summary>
+          <div class="metadata-grid" id="metadata-grid"></div>
+          <pre id="raw-header" tabindex="0" aria-label="Raw manifest header"></pre>
+        </details>
+
+        <div class="export-dock">
+          <div>
+            <p class="eyebrow">TAKE THE EVIDENCE WITH YOU</p>
+            <h3>Download. Diff. Reuse.</h3>
+            <p>The original JSONL stays untouched; the segment export is a compact JSON selection.</p>
+          </div>
+          <div class="export-actions">
+            <a class="button button-primary" id="download-manifest" download>Download manifest</a>
+            <button class="button button-quiet light" id="download-segments" type="button">Export visible segments</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>EGO/SIEVE · MANIFEST INSPECTOR</span>
+      <span>STATIC / LOCAL / REPRODUCIBLE</span>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <noscript>This inspector requires JavaScript to parse local JSONL files.</noscript>
+    <script type="module" src="app.mjs"></script>
+  </body>
+</html>
