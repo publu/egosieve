@@ -331,8 +331,8 @@ def test_tiny_feature_cached_training_builds_evidence(
             device="cpu",
             boundary_tolerance_s=0.16,
         ),
-        backbone_revision="fixture-sha",
-        source_commit="fixture-source-commit",
+        backbone_revision="a" * 40,
+        source_commit="b" * 40,
     )
 
     assert result["test_examples"] == 4
@@ -347,7 +347,7 @@ def test_tiny_feature_cached_training_builds_evidence(
         assert (output / name).is_file()
     report = json.loads((output / "training_report.json").read_text())
     assert report["calibration"]["readiness_temperature"] > 0
-    assert report["backbone"]["revision"] == "fixture-sha"
+    assert report["backbone"]["revision"] == "a" * 40
     split_document = json.loads((output / "splits.json").read_text())
     train_ids = {row["id"] for row in split_document["examples"] if row["split"] == "train"}
     assert set(balancing_input_ids) == train_ids
@@ -360,6 +360,9 @@ def test_tiny_feature_cached_training_builds_evidence(
         "REJECT": 1,
     }
     saved_config = json.loads((output / "config.json").read_text())
+    assert saved_config["backbone_model_id"] == "facebook/dinov2-small"
+    assert saved_config["backbone_revision"] == "a" * 40
+    assert saved_config["vision_config"]["_name_or_path"] == "facebook/dinov2-small"
     assert saved_config["readiness_class_weight"] == balancing["readiness"]["class_weight"]
     assert saved_config["issue_pos_weight"] == balancing["issues"]["positive_weight"]
     assert saved_config["boundary_pos_weight"] == balancing["boundaries"]["positive_weight"]

@@ -79,6 +79,8 @@ class EgoSieveConfig(PretrainedConfig):
         issue_thresholds: Mapping[str, float] | None = None,
         compiler_thresholds: Mapping[str, Any] | None = None,
         calibration_source: str | None = None,
+        backbone_model_id: str | None = None,
+        backbone_revision: str | None = None,
         ignore_index: int = -100,
         **kwargs: Any,
     ) -> None:
@@ -148,6 +150,13 @@ class EgoSieveConfig(PretrainedConfig):
             raise ValueError(f"dropout must be in [0, 1); received {dropout!r}.")
         if initializer_range <= 0:
             raise ValueError("initializer_range must be positive.")
+
+        for name, value in (
+            ("backbone_model_id", backbone_model_id),
+            ("backbone_revision", backbone_revision),
+        ):
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{name} must be a non-empty string or None.")
 
         loss_weights = {
             "readiness_loss_weight": readiness_loss_weight,
@@ -251,6 +260,8 @@ class EgoSieveConfig(PretrainedConfig):
         self.issue_thresholds = normalized_issue_thresholds
         self.compiler_thresholds = default_compiler
         self.calibration_source = calibration_source
+        self.backbone_model_id = None if backbone_model_id is None else backbone_model_id.strip()
+        self.backbone_revision = None if backbone_revision is None else backbone_revision.strip()
         self.ignore_index = int(ignore_index)
 
         # JSON-friendly copies make the output ordering discoverable without

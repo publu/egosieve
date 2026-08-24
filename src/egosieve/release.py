@@ -56,6 +56,12 @@ REQUIRED_METRICS = (
 FORBIDDEN_FILES = ("UNTRAINED_HEADS",)
 UNRESOLVED = re.compile(r"\{\{[A-Z0-9_]+\}\}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
+IMMUTABLE_GIT_REVISION = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
+HUB_MODEL_ID = re.compile(
+    r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?"
+    r"(?:/[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)?\Z"
+)
+WINDOWS_ABSOLUTE_PATH = re.compile(r"[A-Za-z]:[\\/]")
 
 TRAINING_REPORT_SCHEMA = "egosieve.training-report/v1"
 SPLITS_SCHEMA = "egosieve.splits/v1"
@@ -116,6 +122,34 @@ def _non_empty_string(value: Any, dotted: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ReleaseValidationError(f"`{dotted}` must be a non-empty string")
     return value.strip()
+
+
+def _reject_local_paths(value: Any, dotted: str) -> None:
+    """Reject machine-local absolute paths from public JSON artifacts."""
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _reject_local_paths(item, f"{dotted}.{key}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_local_paths(item, f"{dotted}.{index}")
+    elif isinstance(value, str):
+        candidate = value.strip()
+        if (
+            Path(candidate).is_absolute()
+            or candidate.startswith(("~/", "file://"))
+            or WINDOWS_ABSOLUTE_PATH.match(candidate)
+        ):
+            raise ReleaseValidationError(f"`{dotted}` contains a machine-local absolute path")
+
+
+def _immutable_revision(value: Any, dotted: str) -> str:
+    result = _non_empty_string(value, dotted)
+    if not IMMUTABLE_GIT_REVISION.fullmatch(result):
+        raise ReleaseValidationError(
+            f"`{dotted}` must be an immutable 40- or 64-character Git hash"
+        )
+    return result
 
 
 def _sha256(value: Any, dotted: str) -> str:
@@ -249,14 +283,16 @@ def _validate_training_report(
     if report.get("completed") is not True:
         raise ReleaseValidationError("training_report.completed must be true")
     _non_empty_string(report.get("run_id"), "training_report.run_id")
-    _non_empty_string(report.get("source_commit"), "training_report.source_commit")
+    _immutable_revision(report.get("source_commit"), "training_report.source_commit")
     _positive_integer(report.get("optimizer_steps"), "training_report.optimizer_steps")
 
     backbone = report.get("backbone")
     if not isinstance(backbone, dict):
         raise ReleaseValidationError("training_report.backbone must be an object")
-    _non_empty_string(backbone.get("model_id"), "training_report.backbone.model_id")
-    _non_empty_string(backbone.get("revision"), "training_report.backbone.revision")
+    backbone_id = _non_empty_string(backbone.get("model_id"), "training_report.backbone.model_id")
+    if not HUB_MODEL_ID.fullmatch(backbone_id):
+        raise ReleaseValidationError("training_report.backbone.model_id is not a Hub model id")
+    _immutable_revision(backbone.get("revision"), "training_report.backbone.revision")
 
     declared_counts = report.get("split_counts")
     if not isinstance(declared_counts, dict):
@@ -1063,6 +1099,29 @@ def _validate_runtime(root: Path, config: dict[str, Any], processor_config: dict
         raise ReleaseValidationError("config issue label order is invalid")
 
 
+def _validate_backbone_identity(config: dict[str, Any], report: dict[str, Any]) -> None:
+    """Link the public config to the exact backbone declared by the run."""
+
+    report_backbone = report["backbone"]
+    model_id = _non_empty_string(config.get("backbone_model_id"), "config.backbone_model_id")
+    revision = _immutable_revision(config.get("backbone_revision"), "config.backbone_revision")
+    if model_id != report_backbone["model_id"]:
+        raise ReleaseValidationError(
+            "config.backbone_model_id does not match training_report.backbone.model_id"
+        )
+    if revision != report_backbone["revision"]:
+        raise ReleaseValidationError(
+            "config.backbone_revision does not match training_report.backbone.revision"
+        )
+    vision_config = config.get("vision_config")
+    if not isinstance(vision_config, dict):
+        raise ReleaseValidationError("config.vision_config must be an object")
+    if vision_config.get("_name_or_path") != model_id:
+        raise ReleaseValidationError(
+            "config.vision_config._name_or_path must contain the public backbone model id"
+        )
+
+
 def validate_release(directory: str | Path) -> dict[str, Any]:
     """Fail closed on incomplete, unmeasured, or unloadable release artifacts.
 
@@ -1108,6 +1167,17 @@ def validate_release(directory: str | Path) -> dict[str, Any]:
     test_predictions = _load_object(root / "test_predictions.json")
     evidence = _load_object(root / "evidence.json")
 
+    for name, document in (
+        ("config", config),
+        ("preprocessor_config", processor_config),
+        ("metrics", metrics),
+        ("training_report", training_report),
+        ("splits", splits),
+        ("test_predictions", test_predictions),
+        ("evidence", evidence),
+    ):
+        _reject_local_paths(document, name)
+
     if config.get("model_type") != "egosieve":
         raise ReleaseValidationError("config.json model_type must be `egosieve`")
     if config.get("auto_map") != EXPECTED_MODEL_AUTO_MAP:
@@ -1129,6 +1199,7 @@ def validate_release(directory: str | Path) -> dict[str, Any]:
     hashes = _validate_evidence(root, evidence)
     split_by_id, split_counts = _validate_splits(splits)
     _validate_training_report(training_report, hashes, split_counts)
+    _validate_backbone_identity(config, training_report)
     prediction_arrays = _validate_predictions(test_predictions, split_by_id, hashes)
     _validate_metric_linkages(metrics, hashes)
     _recompute_and_validate_metrics(metrics, prediction_arrays)

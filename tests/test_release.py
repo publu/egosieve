@@ -283,6 +283,9 @@ def _refresh_linkages(root) -> None:
 
 def _artifact(tmp_path):
     model = _tiny_trained_model()
+    model.config.backbone_model_id = "facebook/dinov2-small"
+    model.config.backbone_revision = "a" * 40
+    model.config.vision_config._name_or_path = "facebook/dinov2-small"
     save_training_seed(model, tmp_path, processor=EgoSieveProcessor(size=16, num_frames=4))
     (tmp_path / "UNTRAINED_HEADS").unlink()
     (tmp_path / "README.md").write_text(
@@ -300,10 +303,10 @@ def _artifact(tmp_path):
             "schema": "egosieve.training-report/v1",
             "completed": True,
             "run_id": "fixture-run",
-            "source_commit": "0123456789abcdef",
+            "source_commit": "b" * 40,
             "backbone": {
                 "model_id": "facebook/dinov2-small",
-                "revision": "abcdef0123456789",
+                "revision": "a" * 40,
             },
             "optimizer_steps": 1,
             "split_counts": {"train": 2, "validation": 2, "test": 8},
@@ -571,4 +574,31 @@ def test_release_requires_source_and_backbone_revisions(tmp_path, path, match) -
     _write_json(root / "training_report.json", report)
     _refresh_linkages(root)
     with pytest.raises(ReleaseValidationError, match=match):
+        validate_release(root)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "match"),
+    [
+        ("backbone_model_id", "other/model", "backbone_model_id does not match"),
+        ("backbone_revision", "c" * 40, "backbone_revision does not match"),
+    ],
+)
+def test_release_links_config_to_training_backbone(tmp_path, field, value, match) -> None:
+    root = _artifact(tmp_path)
+    config = json.loads((root / "config.json").read_text())
+    config[field] = value
+    _write_json(root / "config.json", config)
+    _refresh_evidence(root)
+    with pytest.raises(ReleaseValidationError, match=match):
+        validate_release(root)
+
+
+def test_release_rejects_machine_local_paths(tmp_path) -> None:
+    root = _artifact(tmp_path)
+    config = json.loads((root / "config.json").read_text())
+    config["vision_config"]["_name_or_path"] = "/private/model-cache/snapshot"
+    _write_json(root / "config.json", config)
+    _refresh_evidence(root)
+    with pytest.raises(ReleaseValidationError, match="machine-local absolute path"):
         validate_release(root)

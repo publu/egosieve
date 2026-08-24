@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import random
+import re
 import time
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -1012,10 +1013,19 @@ def train_checkpoint(
     """Train temporal heads on cached frozen-backbone features and build a candidate."""
 
     run = config or TrainingRunConfig()
-    if not isinstance(backbone_revision, str) or not backbone_revision.strip():
-        raise ValueError("an immutable backbone_revision is required")
-    if not isinstance(source_commit, str) or not source_commit.strip():
-        raise ValueError("the source_commit used for training is required")
+    immutable_revision = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
+    if not isinstance(backbone_revision, str) or not immutable_revision.fullmatch(
+        backbone_revision
+    ):
+        raise ValueError("backbone_revision must be an immutable 40- or 64-character Git hash")
+    if not isinstance(source_commit, str) or not immutable_revision.fullmatch(source_commit):
+        raise ValueError("source_commit must be an immutable 40- or 64-character Git hash")
+    hub_model_id = re.compile(
+        r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?"
+        r"(?:/[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)?\Z"
+    )
+    if not isinstance(backbone, str) or not hub_model_id.fullmatch(backbone.strip()):
+        raise ValueError("backbone must be a public Hugging Face model id")
     _seed_everything(run.seed)
     device = _device(run.device)
     annotation_path = Path(annotations).expanduser().resolve(strict=True)
@@ -1238,6 +1248,11 @@ def train_checkpoint(
     )
     metrics["input_frames"] = model.config.num_frames
 
+    # Preserve public provenance without serializing the machine-local
+    # snapshot path inherited from the backbone's Transformers config.
+    model.config.backbone_model_id = backbone.strip()
+    model.config.backbone_revision = backbone_revision
+    model.config.vision_config._name_or_path = backbone.strip()
     register_for_hub()
     model.save_pretrained(destination, safe_serialization=True)
     processor.save_pretrained(destination)
