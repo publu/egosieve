@@ -18,18 +18,21 @@ EgoSieve is intentionally not a robot policy or a monocular 3D-action claim.
 It solves the expensive step immediately before those systems: deciding which
 video windows are actually usable.
 
-> Status: the architecture, processor, compiler, and release harness are
-> implemented and locally validated. The repository is pre-checkpoint: a
-> public model will ship only with human-grounded readiness and boundary
-> evidence, controlled-corruption issue evidence, and a completed model card.
+> **v0.1.0 is published.** The checkpoint, metadata-only evaluation set, raw
+> held-out predictions, grouped splits, and machine-checked release evidence
+> are public and versioned.
+
+[Model](https://huggingface.co/itspublu/EgoSieve-S) ·
+[Evaluation set](https://huggingface.co/datasets/itspublu/EgoSieve-Eval) ·
+[Manifest inspector](https://huggingface.co/spaces/itspublu/EgoSieve)
 
 ## What one pass returns
 
 For each window:
 
 - `KEEP`, `REVIEW`, and `REJECT` probabilities;
-- independent signals for absent/inactive/occluded hands, unstable camera,
-  blur, exposure, cuts, and duplicate frames;
+- seven independent signals: acting-hand visibility, low hand activity,
+  camera instability, blur, exposure, scene cuts, and duplicate frames;
 - interaction start/end likelihoods;
 - a normalized embedding for clustering and deduplication;
 - timestamps, source hash, sampling configuration, and uncertainty.
@@ -49,10 +52,9 @@ python -m venv .venv
 egosieve inspect recording.mp4
 egosieve plan recording.mp4 --window 6 --stride 2 --frames 12
 
-# After a validated checkpoint is published:
 egosieve scan recording.mp4 \
   --model itspublu/EgoSieve-S \
-  --revision MODEL_COMMIT_SHA \
+  --revision 40f8549166c9c64f205e63c0836cd88f4208d112 \
   --include-embeddings \
   --output recording.egosieve.jsonl
 ```
@@ -64,13 +66,13 @@ from egosieve import EgoSieveConfig, EgoSieveModel
 
 model = EgoSieveModel.from_pretrained(
     "itspublu/EgoSieve-S",
-    revision="MODEL_COMMIT_SHA",
+    revision="40f8549166c9c64f205e63c0836cd88f4208d112",
     trust_remote_code=True,
 )
 ```
 
-Checkpoint loading uses `safetensors`. The public model repository will also
-carry its processor configuration and custom AutoClass mapping. For a Hub
+Checkpoint loading uses `safetensors`. The model repository carries its
+processor configuration and custom AutoClass mapping. For a Hub
 model, pass an immutable commit with `--revision`; the scanner loads the
 processor from the model's resolved commit and records that identity.
 
@@ -120,7 +122,7 @@ are sampled by timestamp, not by pretending nominal FPS is exact. See
 ## Model shape
 
 `EgoSieve-S` uses an Apache-2.0 DINOv2-small image encoder and a lightweight,
-mask-aware stack of gated temporal mixers (about 23.5M parameters with the
+mask-aware stack of gated temporal mixers (about 23.9M parameters with the
 default configuration). It accepts
 `[batch, time, channels, height, width]` plus a frame-validity mask. The four
 output heads are readiness, multi-label issues, per-frame boundaries, and an
@@ -139,6 +141,15 @@ release-ready without grouped splits, human-grounded readiness and boundary
 evaluation, controlled-corruption issue evaluation, calibration, readiness
 breakdowns by source, temporal-boundary metrics, and throughput numbers. The
 full acceptance bar is in [docs/PRODUCT.md](docs/PRODUCT.md).
+
+On the 196-window held-out split, v0.1.0 reaches 0.674 readiness macro-F1,
+0.741 issue macro-AUROC, 0.722 issue macro average precision, and 0.103
+boundary micro-F1 at 0.3 seconds. Readiness and boundaries are HoloAssist
+fine-action-derived proxies, five issue tasks use controlled corruptions, and
+the acting-hand signal follows the source acting-hand modifier. These are
+mixed-evidence results, not an independently annotated in-the-wild benchmark;
+the [model card](https://huggingface.co/itspublu/EgoSieve-S) gives per-task
+support and limitations.
 
 Licensed public media is never fetched implicitly. The opt-in
 [public-corpus workflow](docs/PUBLIC_CORPUS.md) requires exact files, an
@@ -164,7 +175,7 @@ src/egosieve/compiler/   windows → stable segments → manifests
 src/egosieve/corpus/     opt-in acquisition, integrity, and source adapters
 src/egosieve/training/   masked multi-task data and training utilities
 hub/model/               model-card and export assets
-space/                   upload-and-review Hugging Face Space
+space/                   local-only Hugging Face manifest inspector
 tests/                   unit and end-to-end contract tests
 ```
 
