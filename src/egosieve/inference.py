@@ -244,10 +244,14 @@ def _validate_issue_contract(model: Any) -> None:
             f"{list(ISSUE_LABELS)!r}"
         )
     declared_width = getattr(model_config, "num_issue_labels", None)
-    if declared_width != len(ISSUE_LABELS):
+    if (
+        isinstance(declared_width, bool)
+        or not isinstance(declared_width, int)
+        or declared_width != len(ISSUE_LABELS)
+    ):
         raise ValueError(
             "issue-label contract mismatch: model.config.num_issue_labels must equal "
-            f"{len(ISSUE_LABELS)}"
+            f"the integer {len(ISSUE_LABELS)}"
         )
 
 
@@ -650,6 +654,9 @@ def scan_video(
         model=model,
         processor=processor,
     )
+    # Reject semantically incompatible checkpoints before calibration metadata
+    # is read or any media is probed and decoded.
+    _validate_issue_contract(model)
     config = _checkpoint_calibrated_config(config, model)
 
     _validate_frame_contract(config=config, model=model, processor=processor)

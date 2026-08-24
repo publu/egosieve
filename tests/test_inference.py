@@ -189,7 +189,75 @@ def test_prepared_inference_requires_declared_frame_contract(tmp_path) -> None:
         )
 
 
-def test_prepared_inference_rejects_legacy_issue_label_contract(tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("issue_labels", "num_issue_labels"),
+    [
+        (
+            [
+                "no_hands",
+                "low_hand_activity",
+                "hand_occlusion",
+                "camera_instability",
+                "blur",
+                "exposure",
+                "scene_cut",
+                "duplicate_frames",
+            ],
+            8,
+        ),
+        (
+            [
+                "low_hand_activity",
+                "acting_hand_not_visible",
+                "camera_instability",
+                "blur",
+                "exposure",
+                "scene_cut",
+                "duplicate_frames",
+            ],
+            7,
+        ),
+        (
+            [
+                "acting_hand_not_visible",
+                "low_hand_activity",
+                "camera_instability",
+                "blur",
+                "exposure",
+                "scene_cut",
+                "duplicate_frames",
+            ],
+            7.0,
+        ),
+    ],
+)
+def test_prepared_inference_rejects_incompatible_issue_label_contract(
+    tmp_path, issue_labels, num_issue_labels
+) -> None:
+    model = FakeModel()
+    model.config = SimpleNamespace(
+        num_frames=2,
+        max_frames=8,
+        issue_labels=issue_labels,
+        num_issue_labels=num_issue_labels,
+    )
+
+    with pytest.raises(ValueError, match="issue-label contract mismatch"):
+        predict_prepared_video(
+            _prepared(tmp_path),
+            model=model,
+            processor=FakeProcessor(),
+            config=ScanConfig(
+                frames_per_window=2,
+                device="cpu",
+                use_checkpoint_calibration=False,
+            ),
+        )
+
+
+def test_scan_rejects_issue_contract_before_probe(tmp_path) -> None:
+    source = tmp_path / "not-a-real-video.mp4"
+    source.write_bytes(b"the contract must be checked before ffprobe")
     model = FakeModel()
     model.config = SimpleNamespace(
         num_frames=2,
@@ -208,15 +276,14 @@ def test_prepared_inference_rejects_legacy_issue_label_contract(tmp_path) -> Non
     )
 
     with pytest.raises(ValueError, match="issue-label contract mismatch"):
-        predict_prepared_video(
-            _prepared(tmp_path),
+        scan_video(
+            source,
+            model_id="local/test",
+            output_path=tmp_path / "manifest.jsonl",
+            config=ScanConfig(frames_per_window=2, device="cpu"),
+            ffprobe_bin="this-command-must-not-run",
             model=model,
             processor=FakeProcessor(),
-            config=ScanConfig(
-                frames_per_window=2,
-                device="cpu",
-                use_checkpoint_calibration=False,
-            ),
         )
 
 

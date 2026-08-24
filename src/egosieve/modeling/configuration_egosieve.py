@@ -10,7 +10,10 @@ from typing import Any
 from transformers import Dinov2Config, PretrainedConfig
 
 # The order is part of the public model contract.  In particular, changing it
-# would silently reinterpret existing classifier weights.
+# would silently reinterpret existing classifier weights.  These tuples are
+# mirrored in ``training.data`` so that this Hub-loaded configuration module
+# stays self-contained while the lightweight data parser avoids Transformers.
+# A regression test requires both issue-label tuples to remain identical.
 READINESS_LABELS = ("KEEP", "REVIEW", "REJECT")
 ISSUE_LABELS = (
     "acting_hand_not_visible",
@@ -86,8 +89,10 @@ class EgoSieveConfig(PretrainedConfig):
                 "checkpoint config uses an incompatible issue-label vocabulary; "
                 "regenerate the seed checkpoint and retrain for the current seven-label contract"
             )
-        if serialized_num_issue_labels is not None and serialized_num_issue_labels != len(
-            ISSUE_LABELS
+        if serialized_num_issue_labels is not None and (
+            isinstance(serialized_num_issue_labels, bool)
+            or not isinstance(serialized_num_issue_labels, int)
+            or serialized_num_issue_labels != len(ISSUE_LABELS)
         ):
             raise ValueError(
                 "checkpoint config uses an incompatible issue-head width; "

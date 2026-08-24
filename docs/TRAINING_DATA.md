@@ -46,12 +46,18 @@ does not establish any other task.
 
 The [observable-issue augmentation builder](AUGMENTATION.md) can create
 deterministic positive proxies for six visual failure modes from explicitly
-allowed source licenses. Its `hand_occlusion` overlay creates controlled
-positive evidence for `acting_hand_not_visible`. Separate faithful transforms
-preserve existing valid positive labels for `acting_hand_not_visible` and
-`low_hand_activity`. Outputs preserve source group/split identity and mask
-every target that the transformation or inherited annotation does not
-establish.
+allowed source licenses. The transform named `hand_occlusion` draws a synthetic
+opaque overlay and maps it to `acting_hand_not_visible` only as
+programmatic-controlled-corruption evidence. It is not a naturally observed or
+human-inherited visibility label. In contrast, the transform named
+`acting_hand_not_visible` draws no occluder: it only makes a faithful temporal
+and codec re-encode of a source window that already has a valid,
+human-grounded positive for `acting_hand_not_visible`. The analogous
+`low_hand_activity` transform also preserves an existing valid positive.
+Although the synthetic overlay and faithful re-encode share a downstream issue
+name, their provenance remains distinct. Outputs preserve source group/split
+identity and mask every target that the transformation or inherited annotation
+does not establish.
 
 The optional [public-corpus adapter](PUBLIC_CORPUS.md) follows this rule
 literally. Ego-Tactile contact/grip-force action spans are emitted with

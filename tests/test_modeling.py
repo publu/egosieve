@@ -11,6 +11,7 @@ from egosieve import (
     EgoSieveConfig,
     EgoSieveModel,
 )
+from egosieve.training.data import ISSUE_LABELS as TRAINING_ISSUE_LABELS
 
 
 def tiny_config(**overrides) -> EgoSieveConfig:
@@ -73,6 +74,10 @@ def test_pixel_forward_shapes_and_label_contract() -> None:
     )
 
 
+def test_modeling_and_training_issue_vocabularies_are_identical() -> None:
+    assert TRAINING_ISSUE_LABELS == ISSUE_LABELS
+
+
 @pytest.mark.parametrize(
     "legacy_metadata",
     [
@@ -88,10 +93,22 @@ def test_pixel_forward_shapes_and_label_contract() -> None:
                 "duplicate_frames",
             ]
         },
+        {
+            "issue_labels": [
+                "low_hand_activity",
+                "acting_hand_not_visible",
+                "camera_instability",
+                "blur",
+                "exposure",
+                "scene_cut",
+                "duplicate_frames",
+            ]
+        },
         {"num_issue_labels": 8},
+        {"num_issue_labels": 7.0},
     ],
 )
-def test_legacy_eight_issue_checkpoint_metadata_is_rejected(
+def test_incompatible_issue_checkpoint_metadata_is_rejected(
     legacy_metadata: dict[str, object],
 ) -> None:
     with pytest.raises(ValueError, match="regenerate the seed checkpoint and retrain"):

@@ -17,6 +17,10 @@ from typing import Any, TextIO
 import numpy as np
 
 SCHEMA_VERSION = "egosieve.training/v1"
+# Mirrored in ``modeling.configuration_egosieve`` because the latter is copied
+# as self-contained Hub custom code, while this parser intentionally remains
+# independent of Transformers.  A regression test locks the issue tuples
+# together so their public order cannot drift silently.
 READINESS_LABELS = ("KEEP", "REVIEW", "REJECT")
 ISSUE_LABELS = (
     "acting_hand_not_visible",

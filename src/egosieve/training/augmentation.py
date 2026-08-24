@@ -1,13 +1,16 @@
 """Deterministic, license-preserving observable-issue corpus construction.
 
-The builder emits six positive programmatic corruptions. An explicit
-``hand_occlusion`` overlay creates controlled positive evidence for
-``acting_hand_not_visible``. Faithful transforms with the public issue names
-also preserve valid positive source labels for ``acting_hand_not_visible`` and
-``low_hand_activity`` without manufacturing new visual evidence. Every derived
-window activates exactly one issue target; readiness, temporal boundaries, and
-every other issue remain masked. This is a deliberate safety property: an
-unmentioned issue in a source annotation is unknown, never a negative example.
+The builder emits six positive programmatic corruptions. The synthetic
+``hand_occlusion`` overlay maps to ``acting_hand_not_visible`` only as a
+controlled-corruption proxy; it is not inherited human evidence or a naturally
+observed visibility failure. Separately, the transform literally named
+``acting_hand_not_visible`` only re-encodes a source window that already has a
+valid, human-grounded positive for that issue. It does not draw an occluder or
+manufacture a new label. ``low_hand_activity`` follows the same faithful
+re-encode policy. Every derived window activates exactly one issue target;
+readiness, temporal boundaries, and every other issue remain masked. This is a
+deliberate safety property: an unmentioned issue in a source annotation is
+unknown, never a negative example.
 """
 
 from __future__ import annotations
@@ -464,8 +467,10 @@ def _hand_union(window: TrainingWindow, margin: float) -> tuple[float, float, fl
 
     The optional source field is ``hand_regions``: a list of ``[x, y, w, h]``
     boxes normalized to coded-frame width and height.  We deliberately refuse
-    to synthesize the ``acting_hand_not_visible`` target with the
-    ``hand_occlusion`` transform without these spatial annotations.
+    to create the controlled ``acting_hand_not_visible`` proxy with the
+    synthetic ``hand_occlusion`` transform without these spatial annotations.
+    This path is distinct from the faithful ``acting_hand_not_visible``
+    re-encode, which requires an existing human-grounded positive label.
     """
 
     raw = window.extra.get("hand_regions")
