@@ -156,11 +156,28 @@ class EgoSieveModel(EgoSievePreTrainedModel):
             bias=False,
         )
 
-        if config.issue_pos_weight is None:
-            issue_pos_weight = None
-        else:
-            issue_pos_weight = torch.tensor(config.issue_pos_weight, dtype=torch.float32)
+        readiness_class_weight = (
+            None
+            if config.readiness_class_weight is None
+            else torch.tensor(config.readiness_class_weight, dtype=torch.float32)
+        )
+        issue_pos_weight = (
+            None
+            if config.issue_pos_weight is None
+            else torch.tensor(config.issue_pos_weight, dtype=torch.float32)
+        )
+        boundary_pos_weight = (
+            None
+            if config.boundary_pos_weight is None
+            else torch.tensor(config.boundary_pos_weight, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "readiness_class_weight",
+            readiness_class_weight,
+            persistent=False,
+        )
         self.register_buffer("issue_pos_weight", issue_pos_weight, persistent=False)
+        self.register_buffer("boundary_pos_weight", boundary_pos_weight, persistent=False)
         self.post_init()
 
     def get_input_embeddings(self) -> nn.Module:
@@ -295,7 +312,14 @@ class EgoSieveModel(EgoSievePreTrainedModel):
                 raise ValueError("readiness_label_mask must have shape [batch].")
             valid = valid & label_mask.to(device=logits.device, dtype=torch.bool)
         if torch.any(valid):
-            return F.cross_entropy(logits[valid], labels[valid].long())
+            class_weight = self.readiness_class_weight
+            if class_weight is not None:
+                class_weight = class_weight.to(device=logits.device, dtype=logits.dtype)
+            return F.cross_entropy(
+                logits[valid],
+                labels[valid].long(),
+                weight=class_weight,
+            )
         return logits.sum() * 0.0
 
     def _binary_loss(
@@ -317,7 +341,11 @@ class EgoSieveModel(EgoSievePreTrainedModel):
         element_loss = F.binary_cross_entropy_with_logits(
             logits,
             safe_labels,
-            pos_weight=None if pos_weight is None else pos_weight.to(dtype=logits.dtype),
+            pos_weight=(
+                None
+                if pos_weight is None
+                else pos_weight.to(device=logits.device, dtype=logits.dtype)
+            ),
             reduction="none",
         )
         if torch.any(valid):
@@ -425,6 +453,7 @@ class EgoSieveModel(EgoSievePreTrainedModel):
                     boundary_labels,
                     effective_boundary_mask,
                     "boundary_labels",
+                    self.boundary_pos_weight,
                 )
             )
         loss = None if not weighted_losses else sum(weighted_losses[1:], weighted_losses[0])

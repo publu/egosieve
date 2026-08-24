@@ -167,6 +167,68 @@ def test_multitask_loss_supports_ignore_values_and_masks() -> None:
     torch.testing.assert_close(ignored.loss, torch.zeros_like(ignored.loss))
 
 
+def test_task_balancing_weights_change_readiness_and_boundary_losses() -> None:
+    torch.manual_seed(31)
+    base = EgoSieveModel(tiny_config()).eval()
+    weighted = EgoSieveModel(
+        tiny_config(
+            readiness_class_weight=(1.0, 5.0, 1.0),
+            boundary_pos_weight=(4.0, 3.0),
+        )
+    ).eval()
+    weighted.load_state_dict(base.state_dict())
+    embeddings = torch.randn(2, 2, base.config.vision_config.hidden_size)
+    with torch.no_grad():
+        for model in (base, weighted):
+            model.readiness_classifier.weight.zero_()
+            model.readiness_classifier.bias.copy_(torch.tensor([2.0, 0.0, 0.0]))
+            model.boundary_classifier.weight.zero_()
+            model.boundary_classifier.bias.zero_()
+
+        base_readiness = base(
+            frame_embeddings=embeddings,
+            readiness_labels=torch.tensor([0, 1]),
+        ).loss
+        weighted_readiness = weighted(
+            frame_embeddings=embeddings,
+            readiness_labels=torch.tensor([0, 1]),
+        ).loss
+        boundary_labels = torch.tensor(
+            [
+                [[1.0, 0.0], [0.0, 1.0]],
+                [[0.0, 0.0], [0.0, 0.0]],
+            ]
+        )
+        base_boundary = base(
+            frame_embeddings=embeddings,
+            boundary_labels=boundary_labels,
+        ).loss
+        weighted_boundary = weighted(
+            frame_embeddings=embeddings,
+            boundary_labels=boundary_labels,
+        ).loss
+
+    assert weighted_readiness > base_readiness
+    assert weighted_boundary > base_boundary
+    assert base.readiness_class_weight is None
+    assert base.boundary_pos_weight is None
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "error"),
+    [
+        ("readiness_class_weight", (1.0, 2.0), "exactly 3"),
+        ("readiness_class_weight", (1.0, float("nan"), 1.0), "finite and positive"),
+        ("issue_pos_weight", (1.0,) * (len(ISSUE_LABELS) - 1), "exactly 7"),
+        ("boundary_pos_weight", (1.0, 0.0), "finite and positive"),
+        ("boundary_pos_weight", (1.0, float("inf")), "finite and positive"),
+    ],
+)
+def test_task_balancing_config_rejects_invalid_weights(name: str, value, error: str) -> None:
+    with pytest.raises(ValueError, match=error):
+        tiny_config(**{name: value})
+
+
 def test_local_save_and_load_round_trip(tmp_path) -> None:
     torch.manual_seed(4)
     model = EgoSieveModel(tiny_config()).eval()
@@ -195,6 +257,8 @@ def test_local_save_and_load_round_trip(tmp_path) -> None:
     assert saved_config["vision_config"]["model_type"] == "dinov2"
     assert saved_config["num_frames"] == 4
     assert saved_config["issue_labels"] == list(ISSUE_LABELS)
+    assert saved_config["readiness_class_weight"] is None
+    assert saved_config["boundary_pos_weight"] is None
 
 
 def test_input_and_label_validation() -> None:

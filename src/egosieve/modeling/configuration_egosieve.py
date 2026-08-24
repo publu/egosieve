@@ -69,7 +69,9 @@ class EgoSieveConfig(PretrainedConfig):
         readiness_loss_weight: float = 1.0,
         issue_loss_weight: float = 1.0,
         boundary_loss_weight: float = 1.0,
+        readiness_class_weight: Sequence[float] | None = None,
         issue_pos_weight: Sequence[float] | None = None,
+        boundary_pos_weight: Sequence[float] | None = None,
         readiness_temperature: float = 1.0,
         issue_thresholds: Mapping[str, float] | None = None,
         compiler_thresholds: Mapping[str, Any] | None = None,
@@ -151,15 +153,43 @@ class EgoSieveConfig(PretrainedConfig):
             if value < 0:
                 raise ValueError(f"{name} must be non-negative; received {value!r}.")
 
-        if issue_pos_weight is not None:
-            issue_pos_weight = tuple(float(value) for value in issue_pos_weight)
-            if len(issue_pos_weight) != len(ISSUE_LABELS):
+        def validated_weights(
+            values: Sequence[float] | None,
+            *,
+            name: str,
+            expected: int,
+        ) -> tuple[float, ...] | None:
+            if values is None:
+                return None
+            if isinstance(values, (str, bytes)):
+                raise TypeError(f"{name} must be a numeric sequence or None.")
+            try:
+                normalized = tuple(float(value) for value in values)
+            except (TypeError, ValueError) as error:
+                raise TypeError(f"{name} must be a numeric sequence or None.") from error
+            if len(normalized) != expected:
                 raise ValueError(
-                    "issue_pos_weight must contain one value for each issue "
-                    f"({len(ISSUE_LABELS)} values)."
+                    f"{name} must contain exactly {expected} values; received {len(normalized)}."
                 )
-            if any(value <= 0 for value in issue_pos_weight):
-                raise ValueError("Every issue_pos_weight value must be positive.")
+            if any(not isfinite(value) or value <= 0 for value in normalized):
+                raise ValueError(f"Every {name} value must be finite and positive.")
+            return normalized
+
+        readiness_class_weight = validated_weights(
+            readiness_class_weight,
+            name="readiness_class_weight",
+            expected=len(READINESS_LABELS),
+        )
+        issue_pos_weight = validated_weights(
+            issue_pos_weight,
+            name="issue_pos_weight",
+            expected=len(ISSUE_LABELS),
+        )
+        boundary_pos_weight = validated_weights(
+            boundary_pos_weight,
+            name="boundary_pos_weight",
+            expected=len(BOUNDARY_LABELS),
+        )
 
         readiness_temperature = float(readiness_temperature)
         if not isfinite(readiness_temperature) or readiness_temperature <= 0:
@@ -209,7 +239,9 @@ class EgoSieveConfig(PretrainedConfig):
         self.readiness_loss_weight = float(readiness_loss_weight)
         self.issue_loss_weight = float(issue_loss_weight)
         self.boundary_loss_weight = float(boundary_loss_weight)
+        self.readiness_class_weight = readiness_class_weight
         self.issue_pos_weight = issue_pos_weight
+        self.boundary_pos_weight = boundary_pos_weight
         self.readiness_temperature = readiness_temperature
         self.issue_thresholds = normalized_issue_thresholds
         self.compiler_thresholds = default_compiler

@@ -50,6 +50,8 @@ ISSUE_EVIDENCE_PROVENANCE = (
     "human-derived",
     "programmatic-controlled-corruption",
 )
+_MIN_BINARY_POS_WEIGHT = 0.25
+_MAX_BINARY_POS_WEIGHT = 20.0
 
 
 @dataclass(frozen=True)
@@ -166,6 +168,159 @@ def _collate(
         tensor = torch.from_numpy(np.asarray(array))
         result[name] = tensor.to(device)
     return result
+
+
+def _binary_support_and_weights(
+    labels: np.ndarray,
+    valid: np.ndarray,
+    names: Sequence[str],
+    *,
+    task: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Count valid binary support and return clipped negative/positive ratios."""
+
+    if labels.shape != valid.shape or labels.ndim < 2 or labels.shape[-1] != len(names):
+        raise ValueError(f"internal {task} target shape does not match its label vocabulary")
+    positive = np.zeros(len(names), dtype=np.int64)
+    negative = np.zeros(len(names), dtype=np.int64)
+    for column, name in enumerate(names):
+        values = np.asarray(labels[..., column][valid[..., column]], dtype=np.float64)
+        if values.size == 0:
+            raise ValueError(
+                f"train split {task} label {name!r} has no valid targets; "
+                "loss balancing requires both positive and negative train support"
+            )
+        if np.any(~np.isfinite(values)) or np.any((values != 0.0) & (values != 1.0)):
+            raise ValueError(f"train split {task} label {name!r} contains non-binary targets")
+        positive[column] = int(np.count_nonzero(values == 1.0))
+        negative[column] = int(np.count_nonzero(values == 0.0))
+        if positive[column] == 0 or negative[column] == 0:
+            missing = "positive" if positive[column] == 0 else "negative"
+            raise ValueError(
+                f"train split {task} label {name!r} has no valid {missing} targets; "
+                "loss balancing requires both positive and negative train support"
+            )
+    ratios = negative.astype(np.float64) / positive.astype(np.float64)
+    weights = np.clip(ratios, _MIN_BINARY_POS_WEIGHT, _MAX_BINARY_POS_WEIGHT)
+    if np.any(~np.isfinite(weights)):
+        raise ValueError(f"train split {task} positive weights are non-finite")
+    return positive, negative, weights
+
+
+def _compute_loss_balancing(
+    train_examples: Sequence[WindowExample],
+    *,
+    boundary_tolerance_s: float,
+) -> dict[str, Any]:
+    """Derive all task weights exclusively from valid train-split targets.
+
+    Boundary support is counted only after exact timestamps have been
+    rasterized by :class:`TrainingCollator`. An annotated timestamp outside
+    the configured sampled-frame tolerance therefore contributes neither a
+    positive nor a negative target.
+    """
+
+    if not train_examples:
+        raise ValueError("train split is empty; cannot compute loss balancing")
+    collator = TrainingCollator(boundary_tolerance_s=boundary_tolerance_s)
+    targets = collator(
+        [
+            {
+                "window": example.window,
+                "sampled_timestamps_s": example.timestamps_s,
+            }
+            for example in train_examples
+        ]
+    )
+
+    readiness_labels = np.asarray(targets["readiness_labels"], dtype=np.int64)
+    readiness_valid = np.asarray(targets["readiness_label_mask"], dtype=bool)
+    valid_readiness = readiness_labels[readiness_valid]
+    readiness_counts = np.bincount(valid_readiness, minlength=len(READINESS_LABELS)).astype(
+        np.int64
+    )
+    if len(readiness_counts) != len(READINESS_LABELS) or np.any(readiness_counts == 0):
+        missing = [
+            name
+            for index, name in enumerate(READINESS_LABELS)
+            if index >= len(readiness_counts) or readiness_counts[index] == 0
+        ]
+        raise ValueError(
+            "train split readiness targets lack valid support for: " + ", ".join(missing)
+        )
+    inverse_frequency = 1.0 / readiness_counts.astype(np.float64)
+    readiness_weights = inverse_frequency / inverse_frequency.mean()
+    if np.any(~np.isfinite(readiness_weights)) or not math.isclose(
+        float(readiness_weights.mean()),
+        1.0,
+        rel_tol=1e-12,
+        abs_tol=1e-12,
+    ):
+        raise ValueError("train split readiness class weights could not be normalized")
+
+    issue_positive, issue_negative, issue_weights = _binary_support_and_weights(
+        np.asarray(targets["issue_labels"]),
+        np.asarray(targets["issue_label_mask"], dtype=bool),
+        ISSUE_LABELS,
+        task="issue",
+    )
+    boundary_positive, boundary_negative, boundary_weights = _binary_support_and_weights(
+        np.asarray(targets["boundary_labels"]),
+        np.asarray(targets["boundary_label_mask"], dtype=bool),
+        BOUNDARY_LABELS,
+        task="boundary",
+    )
+
+    return {
+        "source_split": "train",
+        "readiness": {
+            "formula": "inverse-frequency-normalized-to-mean-one",
+            "valid_counts": {
+                name: int(readiness_counts[index]) for index, name in enumerate(READINESS_LABELS)
+            },
+            "class_weight": readiness_weights.tolist(),
+        },
+        "issues": {
+            "formula": "valid-negative-count-divided-by-valid-positive-count",
+            "positive_counts": {
+                name: int(issue_positive[index]) for index, name in enumerate(ISSUE_LABELS)
+            },
+            "negative_counts": {
+                name: int(issue_negative[index]) for index, name in enumerate(ISSUE_LABELS)
+            },
+            "positive_weight": issue_weights.tolist(),
+        },
+        "boundaries": {
+            "formula": "valid-negative-frame-count-divided-by-valid-positive-frame-count",
+            "target_contract": "nearest-sampled-frame-within-tolerance",
+            "tolerance_s": float(boundary_tolerance_s),
+            "positive_frame_counts": {
+                name: int(boundary_positive[index]) for index, name in enumerate(BOUNDARY_LABELS)
+            },
+            "negative_frame_counts": {
+                name: int(boundary_negative[index]) for index, name in enumerate(BOUNDARY_LABELS)
+            },
+            "positive_weight": boundary_weights.tolist(),
+        },
+        "binary_positive_weight_clip": {
+            "minimum": _MIN_BINARY_POS_WEIGHT,
+            "maximum": _MAX_BINARY_POS_WEIGHT,
+        },
+    }
+
+
+def _apply_loss_balancing(model: EgoSieveModel, balancing: Mapping[str, Any]) -> None:
+    """Install computed weights in both serializable config and runtime buffers."""
+
+    readiness = tuple(float(value) for value in balancing["readiness"]["class_weight"])
+    issues = tuple(float(value) for value in balancing["issues"]["positive_weight"])
+    boundaries = tuple(float(value) for value in balancing["boundaries"]["positive_weight"])
+    model.config.readiness_class_weight = readiness
+    model.config.issue_pos_weight = issues
+    model.config.boundary_pos_weight = boundaries
+    model.readiness_class_weight = torch.tensor(readiness, dtype=torch.float32)
+    model.issue_pos_weight = torch.tensor(issues, dtype=torch.float32)
+    model.boundary_pos_weight = torch.tensor(boundaries, dtype=torch.float32)
 
 
 def _contrastive_loss(
@@ -901,6 +1056,11 @@ def train_checkpoint(
         raise ValueError("every split must contain at least one labeled window")
     if run.contrastive_weight > 0 and len(split_examples["train"]) < 2:
         raise ValueError("contrastive retrieval training requires at least two train windows")
+    loss_balancing = _compute_loss_balancing(
+        split_examples["train"],
+        boundary_tolerance_s=run.boundary_tolerance_s,
+    )
+    _apply_loss_balancing(model, loss_balancing)
 
     feature_cache = FeatureCache(
         cache_dir,
@@ -1135,6 +1295,7 @@ def train_checkpoint(
             "same_group_negatives_masked": True,
             "positive_pairs": contrastive_positive_pairs,
         },
+        "loss_balancing": loss_balancing,
         "config": asdict(run),
         "annotations": {
             "filename": annotation_path.name,

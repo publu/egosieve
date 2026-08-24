@@ -13,9 +13,14 @@ from egosieve.initialization import initialize_from_backbone, save_training_seed
 from egosieve.modeling import ISSUE_LABELS, EgoSieveModel
 from egosieve.processing_egosieve import EgoSieveProcessor
 from egosieve.training import TrainingRunConfig, train_checkpoint
+from egosieve.training import runner as training_runner
 from egosieve.training.data import TrainingWindow
 from egosieve.training.features import WindowExample, feature_cache_key
-from egosieve.training.runner import _contrastive_loss, _test_prediction_document
+from egosieve.training.runner import (
+    _compute_loss_balancing,
+    _contrastive_loss,
+    _test_prediction_document,
+)
 
 
 def _video(path: Path, hue: int) -> None:
@@ -158,8 +163,81 @@ def test_contrastive_loss_is_safe_without_any_eligible_negatives(batch_size: int
     torch.testing.assert_close(second.grad, torch.zeros_like(second))
 
 
+def _balancing_examples(*, matched_boundaries: bool = True) -> list[WindowExample]:
+    labels = ("KEEP", "KEEP", "KEEP", "REVIEW", "REVIEW", "REJECT")
+    examples = []
+    for row, readiness in enumerate(labels):
+        issues = {name: row < (column % 5) + 1 for column, name in enumerate(ISSUE_LABELS)}
+        examples.append(
+            WindowExample(
+                key=f"train:{row}",
+                record_id=f"train-{row}",
+                group_id=f"capture-{row}",
+                source="fixture",
+                license="CC0-1.0",
+                video_path=Path("unused.mp4"),
+                window_index=0,
+                window=TrainingWindow(
+                    0.0,
+                    1.0,
+                    readiness=readiness,
+                    readiness_valid=True,
+                    issues=issues,
+                    issue_valid={name: True for name in ISSUE_LABELS},
+                    boundaries_s=(
+                        {"start": 0.1, "end": 0.7}
+                        if matched_boundaries
+                        else {"start": 0.0, "end": 1.0}
+                    ),
+                    boundary_valid=True,
+                ),
+                timestamps_s=(0.1, 0.3, 0.5, 0.7),
+            )
+        )
+    return examples
+
+
+def test_loss_balancing_uses_valid_train_targets_and_clips_binary_ratios() -> None:
+    balancing = _compute_loss_balancing(
+        _balancing_examples(),
+        boundary_tolerance_s=0.01,
+    )
+
+    inverse = torch.tensor([1 / 3, 1 / 2, 1.0])
+    expected_readiness = inverse / inverse.mean()
+    torch.testing.assert_close(
+        torch.tensor(balancing["readiness"]["class_weight"]),
+        expected_readiness,
+    )
+    assert balancing["source_split"] == "train"
+    assert balancing["readiness"]["valid_counts"] == {
+        "KEEP": 3,
+        "REVIEW": 2,
+        "REJECT": 1,
+    }
+    assert balancing["issues"]["positive_weight"][:5] == [5.0, 2.0, 1.0, 0.5, 0.25]
+    assert balancing["binary_positive_weight_clip"] == {
+        "minimum": 0.25,
+        "maximum": 20.0,
+    }
+    assert balancing["boundaries"]["positive_frame_counts"] == {"start": 6, "end": 6}
+    assert balancing["boundaries"]["negative_frame_counts"] == {"start": 18, "end": 18}
+    assert balancing["boundaries"]["positive_weight"] == [3.0, 3.0]
+
+
+def test_boundary_balancing_rejects_raw_annotations_outside_sample_tolerance() -> None:
+    with pytest.raises(ValueError, match="boundary label 'start' has no valid targets"):
+        _compute_loss_balancing(
+            _balancing_examples(matched_boundaries=False),
+            boundary_tolerance_s=0.01,
+        )
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
-def test_tiny_feature_cached_training_builds_evidence(tmp_path: Path) -> None:
+def test_tiny_feature_cached_training_builds_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seed_dir = tmp_path / "seed"
     initial = _seed(seed_dir)
     rows = []
@@ -225,6 +303,17 @@ def test_tiny_feature_cached_training_builds_evidence(tmp_path: Path) -> None:
     annotations = tmp_path / "annotations.jsonl"
     annotations.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     output = tmp_path / "release"
+    balancing_input_ids: list[str] = []
+    compute_loss_balancing = training_runner._compute_loss_balancing
+
+    def tracked_loss_balancing(train_examples, *, boundary_tolerance_s):
+        balancing_input_ids.extend(example.key for example in train_examples)
+        return compute_loss_balancing(
+            train_examples,
+            boundary_tolerance_s=boundary_tolerance_s,
+        )
+
+    monkeypatch.setattr(training_runner, "_compute_loss_balancing", tracked_loss_balancing)
     result = train_checkpoint(
         annotations,
         seed_checkpoint=seed_dir,
@@ -259,6 +348,21 @@ def test_tiny_feature_cached_training_builds_evidence(tmp_path: Path) -> None:
     report = json.loads((output / "training_report.json").read_text())
     assert report["calibration"]["readiness_temperature"] > 0
     assert report["backbone"]["revision"] == "fixture-sha"
+    split_document = json.loads((output / "splits.json").read_text())
+    train_ids = {row["id"] for row in split_document["examples"] if row["split"] == "train"}
+    assert set(balancing_input_ids) == train_ids
+    assert len(balancing_input_ids) == len(train_ids)
+    balancing = report["loss_balancing"]
+    assert balancing["source_split"] == "train"
+    assert balancing["readiness"]["valid_counts"] == {
+        "KEEP": 1,
+        "REVIEW": 1,
+        "REJECT": 1,
+    }
+    saved_config = json.loads((output / "config.json").read_text())
+    assert saved_config["readiness_class_weight"] == balancing["readiness"]["class_weight"]
+    assert saved_config["issue_pos_weight"] == balancing["issues"]["positive_weight"]
+    assert saved_config["boundary_pos_weight"] == balancing["boundaries"]["positive_weight"]
     predictions = json.loads((output / "test_predictions.json").read_text())
     assert len(predictions["examples"]) == 4
     corruption = next(row for row in predictions["examples"] if not row["readiness_valid"])
