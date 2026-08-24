@@ -1,0 +1,22 @@
+[
+  {
+    "episode_index": 0,
+    "length": 4,
+    "data/chunk_index": 0,
+    "data/file_index": 0,
+    "videos/observation.images.ego/chunk_index": 0,
+    "videos/observation.images.ego/file_index": 0,
+    "videos/observation.images.ego/from_timestamp": 0.0,
+    "videos/observation.images.ego/to_timestamp": 2.0
+  },
+  {
+    "episode_index": 1,
+    "length": 3,
+    "data/chunk_index": 0,
+    "data/file_index": 0,
+    "videos/observation.images.ego/chunk_index": 0,
+    "videos/observation.images.ego/file_index": 0,
+    "videos/observation.images.ego/from_timestamp": 2.0,
+    "videos/observation.images.ego/to_timestamp": 3.5
+  }
+]

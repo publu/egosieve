@@ -1,0 +1,16 @@
+.DS_Store
+._*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+artifacts/
+outputs/
+data/
+*.mp4
+*.mov
+*.mkv

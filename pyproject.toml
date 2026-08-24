@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "egosieve"
+version = "0.1.0"
+description = "Find and compile manipulation-ready windows in egocentric video"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{name = "EgoSieve contributors"}]
+keywords = [
+  "egocentric-video",
+  "robotics",
+  "video-quality",
+  "dataset-curation",
+  "huggingface",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Multimedia :: Video",
+]
+dependencies = [
+  "numpy>=1.26",
+  "pillow>=10",
+  "safetensors>=0.4",
+  "torch>=2.2",
+  "transformers>=4.50",
+]
+
+[project.optional-dependencies]
+hub = ["datasets>=4", "huggingface-hub>=0.30", "pyarrow>=18"]
+pipeline = ["av>=14"]
+space = ["gradio>=5.0,<6", "plotly>=5.24"]
+train = ["accelerate>=1.2", "scikit-learn>=1.5"]
+dev = ["av>=14", "pytest>=8", "pytest-cov>=6", "ruff>=0.9"]
+all = [
+  "accelerate>=1.2",
+  "av>=14",
+  "datasets>=4",
+  "gradio>=5.0,<6",
+  "huggingface-hub>=0.30",
+  "plotly>=5.24",
+  "pyarrow>=18",
+  "pytest>=8",
+  "pytest-cov>=6",
+  "ruff>=0.9",
+  "scikit-learn>=1.5",
+]
+
+[project.scripts]
+egosieve = "egosieve.cli:main"
+egosieve-build-corpus = "egosieve.training.augmentation:main"
+
+[project.urls]
+Documentation = "https://github.com/publu/egosieve#readme"
+Issues = "https://github.com/publu/egosieve/issues"
+Source = "https://github.com/publu/egosieve"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_inference.py" = ["E402"]
+"tests/test_hf_video_contract.py" = ["E402"]
+"tests/test_initialization.py" = ["E402"]
+"tests/test_processor.py" = ["E402"]

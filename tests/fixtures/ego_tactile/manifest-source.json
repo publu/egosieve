@@ -1,0 +1,16 @@
+{
+  "profile": "ego-tactile",
+  "name": "Ego-Tactile Manipulation",
+  "source_url": "https://huggingface.co/datasets/OpenGraphLabs-Research/ego-tactile-manipulation",
+  "repository": {
+    "type": "huggingface_dataset",
+    "id": "OpenGraphLabs-Research/ego-tactile-manipulation",
+    "revision": "90c4e304b8e3a9578d5bb938992206358db1a660"
+  },
+  "license": {
+    "id": "CC-BY-4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "declaration_url": "https://huggingface.co/datasets/OpenGraphLabs-Research/ego-tactile-manipulation#license",
+    "attribution": "OpenGraph Labs, Ego-Tactile Manipulation (2026), https://huggingface.co/datasets/OpenGraphLabs-Research/ego-tactile-manipulation"
+  }
+}

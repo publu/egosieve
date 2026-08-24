@@ -1,0 +1,3 @@
+egosieve @ git+https://github.com/publu/egosieve.git@v0.1.0
+gradio==5.47.2
+plotly==6.9.0

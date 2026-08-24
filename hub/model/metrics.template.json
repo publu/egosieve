@@ -1,0 +1,67 @@
+{
+  "schema": "egosieve.release-metrics/v1",
+  "readiness": {
+    "macro_f1": null,
+    "per_class": {
+      "KEEP": {"precision": null, "recall": null, "f1": null, "support": null},
+      "REVIEW": {"precision": null, "recall": null, "f1": null, "support": null},
+      "REJECT": {"precision": null, "recall": null, "f1": null, "support": null}
+    },
+    "confusion_matrix": [[null, null, null], [null, null, null], [null, null, null]]
+  },
+  "issues": {
+    "macro_auroc": null,
+    "macro_average_precision": null,
+    "per_issue": {
+      "no_hands": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "low_hand_activity": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "hand_occlusion": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "camera_instability": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "blur": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "exposure": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "scene_cut": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "duplicate_frames": {"auroc": null, "average_precision": null, "positives": null, "negatives": null}
+    }
+  },
+  "boundaries": {
+    "f1": null,
+    "tolerance_s": null,
+    "per_boundary": {
+      "start": {"f1": null, "true_positives": null, "false_positives": null, "false_negatives": null},
+      "end": {"f1": null, "true_positives": null, "false_positives": null, "false_negatives": null}
+    }
+  },
+  "calibration": {
+    "ece": null,
+    "n_bins": null,
+    "selective_risk": []
+  },
+  "throughput": {
+    "cpu_windows_per_second": null,
+    "gpu_windows_per_second": null
+  },
+  "evaluation": {
+    "readiness_human_grounded": false,
+    "issues_controlled_corruptions": false,
+    "grouped_split": false,
+    "test_examples": null,
+    "readiness_examples": null,
+    "issue_examples": null,
+    "boundary_examples": null,
+    "issue_examples_by_provenance": {
+      "human": null,
+      "human-derived": null,
+      "programmatic-controlled-corruption": null
+    },
+    "annotation_guide": "",
+    "per_source": {}
+  },
+  "data": {
+    "datasets": []
+  },
+  "evidence": {
+    "checkpoint_sha256": "",
+    "splits_sha256": "",
+    "test_predictions_sha256": ""
+  }
+}

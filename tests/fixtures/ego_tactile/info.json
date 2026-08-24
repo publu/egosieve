@@ -1,0 +1,18 @@
+{
+  "codebase_version": "v3.0",
+  "fps": 2,
+  "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+  "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
+  "features": {
+    "observation.images.ego": {"dtype": "video"},
+    "annotation.l0_action": {"dtype": "string"},
+    "annotation.l1_subaction": {"dtype": "string"},
+    "annotation.anchor": {"dtype": "string"},
+    "annotation.grasp_type": {"dtype": "string"},
+    "annotation.hand": {"dtype": "string"},
+    "annotation.target_object": {"dtype": "string"},
+    "timestamp": {"dtype": "float32"},
+    "frame_index": {"dtype": "int64"},
+    "episode_index": {"dtype": "int64"}
+  }
+}

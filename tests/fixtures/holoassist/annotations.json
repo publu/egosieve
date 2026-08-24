@@ -1,0 +1,58 @@
+[
+  {
+    "batch": "fixture-batch",
+    "videoMetadata": {
+      "duration": {
+        "raw": "00:00:30.00",
+        "seconds": 30
+      }
+    },
+    "events": [
+      {
+        "id": 22,
+        "label": "Fine grained action",
+        "start": 12.125,
+        "end": 16.875,
+        "type": "range",
+        "attributes": {
+          "Action Correctness": "Wrong Action, corrected by instructor verbally",
+          "Incorrect Action Explanation": "fixture explanation",
+          "Incorrect Action Corrected by": "instructor",
+          "Verb": "insert",
+          "Adjective": "none",
+          "Noun": "part",
+          "adverbial": "none"
+        }
+      },
+      {
+        "id": 11,
+        "label": "Fine grained action",
+        "start": 4.125,
+        "end": 8.875,
+        "type": "range",
+        "attributes": {
+          "Action Correctness": "Correct Action",
+          "Incorrect Action Explanation": "none",
+          "Incorrect Action Corrected by": "none",
+          "Verb": "grab",
+          "Adjective": "none",
+          "Noun": "part",
+          "adverbial": "left hand"
+        }
+      },
+      {
+        "id": 1,
+        "label": "Narration",
+        "start": 0,
+        "end": 30,
+        "type": "range",
+        "attributes": {
+          "Long form description": "Synthetic offline fixture."
+        }
+      }
+    ],
+    "taskId": "fixture-task-id",
+    "taskType": "assemble fixture",
+    "video_name": "R999-Fixture-Task"
+  }
+]
