@@ -2,7 +2,7 @@
 title: EgoSieve
 emoji: 🎞️
 colorFrom: gray
-colorTo: orange
+colorTo: yellow
 sdk: static
 app_file: index.html
 models:
