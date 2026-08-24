@@ -21,11 +21,10 @@ brief occlusion may still leave a useful window.
 
 ## Observable issues
 
-- `no_hands`: no human hand is visibly present.
+- `acting_hand_not_visible`: the task-relevant acting hand or critical contact
+  region is outside the frame or hidden long enough to obstruct interpretation.
 - `low_hand_activity`: hands may be visible, but there is no meaningful hand or
   object-state change.
-- `hand_occlusion`: the acting hand or critical contact region is hidden long
-  enough to obstruct interpretation.
 - `camera_instability`: camera motion or rolling blur prevents stable visual
   tracking; ordinary intentional head motion alone is not an issue.
 - `blur`: defocus or motion blur removes task-relevant detail.

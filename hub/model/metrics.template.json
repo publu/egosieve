@@ -13,9 +13,8 @@
     "macro_auroc": null,
     "macro_average_precision": null,
     "per_issue": {
-      "no_hands": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
+      "acting_hand_not_visible": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
       "low_hand_activity": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
-      "hand_occlusion": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
       "camera_instability": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
       "blur": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
       "exposure": {"auroc": null, "average_precision": null, "positives": null, "negatives": null},
@@ -46,6 +45,10 @@
     "grouped_split": false,
     "test_examples": null,
     "readiness_examples": null,
+    "readiness_examples_by_provenance": {
+      "human": null,
+      "human-derived": null
+    },
     "issue_examples": null,
     "boundary_examples": null,
     "issue_examples_by_provenance": {

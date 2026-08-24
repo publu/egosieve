@@ -69,8 +69,8 @@ def _write_annotations(
     window: dict[str, object] = {
         "start_s": 0.0,
         "end_s": 2.0,
-        "issues": {"no_hands": False},
-        "issue_valid": {"no_hands": True},
+        "issues": {"acting_hand_not_visible": False},
+        "issue_valid": {"acting_hand_not_visible": True},
         "annotator": "human-reviewer-a",
         "label_provenance": {
             "readiness": {"kind": "unlabeled"},
@@ -135,6 +135,8 @@ def test_builder_emits_positive_only_proxies_with_complete_provenance(tmp_path: 
     assert result.generated_count == 6
     assert result.skipped_count == 2
     assert set(TRANSFORM_TO_ISSUE.values()) == set(ISSUE_LABELS)
+    assert TRANSFORM_TO_ISSUE["hand_occlusion"] == "acting_hand_not_visible"
+    assert TRANSFORM_TO_ISSUE["acting_hand_not_visible"] == "acting_hand_not_visible"
     records = load_jsonl(result.annotations_path)
     assert len(records) == 6
     assert {record.extra["augmentation"]["transform"] for record in records} == {
@@ -183,7 +185,7 @@ def test_builder_emits_positive_only_proxies_with_complete_provenance(tmp_path: 
     assert manifest["label_policy"]["kinds"] == {"programmatic-controlled-corruption": 6}
     assert manifest["label_policy"]["unknown_issues_are_negative"] is False
     assert manifest["label_policy"]["source_inherited_issues"] == [
-        "no_hands",
+        "acting_hand_not_visible",
         "low_hand_activity",
     ]
     assert manifest["split_policy"]["group_id_preserved"] is True
@@ -223,7 +225,10 @@ def test_builder_emits_positive_only_proxies_with_complete_provenance(tmp_path: 
         assert row["output"]["sha256"] == sha256_file(derived)
 
     skipped = _read_jsonl(result.skipped_path)
-    assert {row["transform"] for row in skipped} == {"no_hands", "low_hand_activity"}
+    assert {row["transform"] for row in skipped} == {
+        "acting_hand_not_visible",
+        "low_hand_activity",
+    }
     assert {row["code"] for row in skipped} == {"source_positive_required"}
 
 
@@ -273,7 +278,7 @@ def test_transforms_have_observable_evidence(tmp_path: Path) -> None:
 def test_non_corruption_issues_require_and_inherit_source_evidence(tmp_path: Path) -> None:
     _make_source(tmp_path / "videos" / "source.mp4")
     windows = []
-    for index, issue in enumerate(("no_hands", "low_hand_activity")):
+    for index, issue in enumerate(("acting_hand_not_visible", "low_hand_activity")):
         source_kind = "human" if index == 0 else "human-derived"
         label_provenance: dict[str, object] = {
             "readiness": {"kind": source_kind},
@@ -317,7 +322,7 @@ def test_non_corruption_issues_require_and_inherit_source_evidence(tmp_path: Pat
         annotations,
         tmp_path / "derived",
         allowed_licenses=["CC0-1.0"],
-        config=AugmentationConfig(transforms=("no_hands", "low_hand_activity")),
+        config=AugmentationConfig(transforms=("acting_hand_not_visible", "low_hand_activity")),
         ffmpeg_bin=str(FFMPEG),
         ffprobe_bin=str(FFPROBE),
     )
@@ -326,7 +331,7 @@ def test_non_corruption_issues_require_and_inherit_source_evidence(tmp_path: Pat
     assert result.skipped_count == 2
     records = load_jsonl(result.annotations_path)
     assert {next(iter(record.windows[0].issues)) for record in records} == {
-        "no_hands",
+        "acting_hand_not_visible",
         "low_hand_activity",
     }
     for record in records:
@@ -363,8 +368,8 @@ def test_faithful_reencode_rejects_non_task_human_issue_provenance(
     annotations = _write_annotations(tmp_path)
     source = json.loads(annotations.read_text(encoding="utf-8"))
     window = source["windows"][0]
-    window["issues"]["no_hands"] = True
-    window["issue_valid"]["no_hands"] = True
+    window["issues"]["acting_hand_not_visible"] = True
+    window["issue_valid"]["acting_hand_not_visible"] = True
     if source_provenance == "controlled":
         window["label_provenance"]["issues"] = {"kind": "programmatic-controlled-corruption"}
     else:
@@ -375,7 +380,7 @@ def test_faithful_reencode_rejects_non_task_human_issue_provenance(
         annotations,
         tmp_path / "derived",
         allowed_licenses=["CC0-1.0"],
-        config=AugmentationConfig(transforms=("blur", "no_hands")),
+        config=AugmentationConfig(transforms=("blur", "acting_hand_not_visible")),
         ffmpeg_bin=str(FFMPEG),
         ffprobe_bin=str(FFPROBE),
     )
@@ -388,7 +393,7 @@ def test_faithful_reencode_rejects_non_task_human_issue_provenance(
         "programmatic-controlled-corruption"
     )
     skipped = _read_jsonl(result.skipped_path)
-    assert skipped[0]["transform"] == "no_hands"
+    assert skipped[0]["transform"] == "acting_hand_not_visible"
     assert skipped[0]["code"] == "human_issue_provenance_required"
 
 
@@ -459,7 +464,7 @@ def test_occlusion_without_hand_regions_is_skipped_not_mislabeled(tmp_path: Path
     assert skipped[0]["code"] == "hand_regions_missing"
     record = load_jsonl(result.annotations_path)[0]
     assert record.windows[0].issues == {"blur": True}
-    assert "hand_occlusion" not in record.windows[0].issue_valid
+    assert "acting_hand_not_visible" not in record.windows[0].issue_valid
 
 
 def test_group_cannot_cross_preassigned_splits(tmp_path: Path) -> None:

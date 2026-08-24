@@ -53,7 +53,7 @@ def _tiny_trained_model():
     frame_embeddings = torch.randn(6, 4, 24)
     readiness_labels = torch.tensor([0, 1, 2, 0, 1, 2])
     issue_labels = torch.tensor(
-        [[float((row + column) % 2) for column in range(8)] for row in range(6)]
+        [[float((row + column) % 2) for column in range(len(ISSUE_LABELS))] for row in range(6)]
     )
     boundary_labels = torch.zeros(6, 4, 2)
     boundary_labels[:, 1, 0] = 1
@@ -109,8 +109,8 @@ def _prediction_document(checkpoint_hash: str, splits_hash: str) -> dict:
         readiness = [0.05, 0.05, 0.05]
         readiness[readiness_index] = 0.9
         issue_kind = "human" if index == 0 else "human-derived" if index == 1 else "unlabeled"
-        issue_mask = [index < 2] * 3 + [False] * 5
-        issue_targets = [index if index < 2 else None] * 3 + [None] * 5
+        issue_mask = [index < 2] * 3 + [False] * (len(ISSUE_LABELS) - 3)
+        issue_targets = [index if index < 2 else None] * 3 + [None] * (len(ISSUE_LABELS) - 3)
         examples.append(
             {
                 "id": f"test-{index}",
@@ -128,7 +128,8 @@ def _prediction_document(checkpoint_hash: str, splits_hash: str) -> dict:
                 "readiness_probabilities": readiness,
                 "issue_targets": issue_targets,
                 "issue_valid": issue_mask,
-                "issue_probabilities": [0.9 if index == 1 else 0.1] * 3 + [0.1] * 5,
+                "issue_probabilities": [0.9 if index == 1 else 0.1] * 3
+                + [0.1] * (len(ISSUE_LABELS) - 3),
                 "boundary_reference_s": [index * 10 + 1.0, index * 10 + 4.0],
                 "boundary_prediction_s": [index * 10 + 1.0, index * 10 + 4.0],
                 "boundary_reference_valid": [True, True],
@@ -149,9 +150,9 @@ def _prediction_document(checkpoint_hash: str, splits_hash: str) -> dict:
                 "readiness_valid": False,
                 "readiness_target": None,
                 "readiness_probabilities": [0.05, 0.05, 0.9],
-                "issue_targets": [issue_target] * 8,
-                "issue_valid": [True] * 8,
-                "issue_probabilities": [0.9 if issue_target else 0.1] * 8,
+                "issue_targets": [issue_target] * len(ISSUE_LABELS),
+                "issue_valid": [True] * len(ISSUE_LABELS),
+                "issue_probabilities": [0.9 if issue_target else 0.1] * len(ISSUE_LABELS),
                 "boundary_reference_s": [None, None],
                 "boundary_prediction_s": [None, None],
                 "boundary_reference_valid": [False, False],
@@ -221,6 +222,10 @@ def _metrics_document(checkpoint_hash: str, splits_hash: str, predictions_hash: 
             "grouped_split": True,
             "test_examples": 8,
             "readiness_examples": 6,
+            "readiness_examples_by_provenance": {
+                "human": 5,
+                "human-derived": 1,
+            },
             "issue_examples": 4,
             "boundary_examples": 6,
             "issue_examples_by_provenance": {
@@ -450,6 +455,22 @@ def test_release_requires_some_controlled_corruption_issue_provenance(tmp_path) 
     _write_json(root / "test_predictions.json", predictions)
     _refresh_linkages(root)
     with pytest.raises(ReleaseValidationError, match="at least one issue-valid row"):
+        validate_release(root)
+
+
+def test_release_recomputes_readiness_provenance_counts(tmp_path) -> None:
+    root = _artifact(tmp_path)
+    metrics = json.loads((root / "metrics.json").read_text())
+    metrics["evaluation"]["readiness_examples_by_provenance"] = {
+        "human": 4,
+        "human-derived": 2,
+    }
+    _write_json(root / "metrics.json", metrics)
+    _refresh_linkages(root)
+    with pytest.raises(
+        ReleaseValidationError,
+        match=r"readiness_examples_by_provenance\.human.*does not match",
+    ):
         validate_release(root)
 
 

@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pytest
 
+from egosieve import ISSUE_LABELS as MODEL_ISSUE_LABELS
 from egosieve.training.data import (
     ISSUE_LABELS,
     SCHEMA_VERSION,
@@ -26,6 +27,10 @@ def _record(record_id: str = "episode-1", group_id: str = "session-1") -> dict:
         "license": "dataset-owner-declared",
         "windows": [],
     }
+
+
+def test_training_and_model_issue_vocabularies_are_identical() -> None:
+    assert ISSUE_LABELS == MODEL_ISSUE_LABELS
 
 
 def test_sparse_labels_become_values_with_independent_validity_masks() -> None:
@@ -51,7 +56,7 @@ def test_sparse_labels_become_values_with_independent_validity_masks() -> None:
     blur = ISSUE_LABELS.index("blur")
     assert targets.issue_labels[:, blur].tolist() == [0.0, 0.0]
     assert targets.issue_label_mask[:, blur].tolist() == [False, True]
-    assert not targets.issue_label_mask[:, ISSUE_LABELS.index("hand_occlusion")].any()
+    assert not targets.issue_label_mask[:, ISSUE_LABELS.index("acting_hand_not_visible")].any()
     np.testing.assert_allclose(targets.boundary_times_s[1], [3.2, 0.0])
     assert targets.boundary_time_mask.tolist() == [[False, False], [True, False]]
 
@@ -84,6 +89,22 @@ def test_issue_typo_is_rejected_unless_vocabulary_is_explicit() -> None:
     targets = encode_records([custom], issue_names=("blru",))
     assert targets.issue_labels.tolist() == [[1.0]]
     assert targets.issue_label_mask.tolist() == [[True]]
+
+
+@pytest.mark.parametrize("legacy_issue", ["no_hands", "hand_occlusion"])
+def test_legacy_issue_keys_are_rejected(legacy_issue: str) -> None:
+    raw = _record()
+    raw["windows"] = [
+        {
+            "start_s": 0.0,
+            "end_s": 1.0,
+            "issues": {legacy_issue: True},
+            "issue_valid": {legacy_issue: True},
+        }
+    ]
+
+    with pytest.raises(TrainingDataError, match="unknown issue"):
+        parse_record(raw)
 
 
 def test_boundary_timestamps_are_rasterized_with_nearest_frame_and_tolerance() -> None:

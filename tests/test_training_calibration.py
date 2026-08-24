@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from egosieve.training import (
+    ISSUE_LABELS,
     fit_issue_thresholds,
     fit_readiness_temperature,
     fit_routing_thresholds,
@@ -24,12 +25,12 @@ def test_temperature_is_positive_and_improves_overconfident_logits() -> None:
 
 
 def test_issue_thresholds_use_only_declared_targets() -> None:
-    labels = np.tile(np.asarray([[0.0], [1.0], [1.0], [0.0]]), (1, 8))
-    scores = np.tile(np.asarray([[0.1], [0.4], [0.8], [0.2]]), (1, 8))
+    labels = np.tile(np.asarray([[0.0], [1.0], [1.0], [0.0]]), (1, len(ISSUE_LABELS)))
+    scores = np.tile(np.asarray([[0.1], [0.4], [0.8], [0.2]]), (1, len(ISSUE_LABELS)))
     valid = np.ones_like(labels, dtype=bool)
-    valid[:, 3] = False
+    valid[:, ISSUE_LABELS.index("camera_instability")] = False
     thresholds = fit_issue_thresholds(labels, scores, valid)
-    assert len(thresholds) == 8
+    assert len(thresholds) == len(ISSUE_LABELS)
     assert thresholds["camera_instability"] == 0.5
     assert 0.2 < thresholds["blur"] <= 0.4
 

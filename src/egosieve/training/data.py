@@ -19,9 +19,8 @@ import numpy as np
 SCHEMA_VERSION = "egosieve.training/v1"
 READINESS_LABELS = ("KEEP", "REVIEW", "REJECT")
 ISSUE_LABELS = (
-    "no_hands",
+    "acting_hand_not_visible",
     "low_hand_activity",
-    "hand_occlusion",
     "camera_instability",
     "blur",
     "exposure",

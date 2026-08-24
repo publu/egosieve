@@ -17,8 +17,8 @@ provided target builder and collator.
       "end_s": 14.0,
       "readiness": "KEEP",
       "readiness_valid": true,
-      "issues": {"blur": false, "hand_occlusion": true},
-      "issue_valid": {"blur": true, "hand_occlusion": true},
+      "issues": {"blur": false, "acting_hand_not_visible": true},
+      "issue_valid": {"blur": true, "acting_hand_not_visible": true},
       "boundaries_s": {"start": 8.4, "end": 13.7},
       "boundary_valid": true,
       "annotator": "human"
@@ -46,17 +46,19 @@ does not establish any other task.
 
 The [observable-issue augmentation builder](AUGMENTATION.md) can create
 deterministic positive proxies for six visual failure modes from explicitly
-allowed source licenses. It covers `no_hands` and `low_hand_activity` only by
-faithfully re-encoding windows with an existing valid positive label. Its
-outputs preserve source group/split identity and mask every target that the
-transformation or inherited annotation does not establish.
+allowed source licenses. Its `hand_occlusion` overlay creates controlled
+positive evidence for `acting_hand_not_visible`. Separate faithful transforms
+preserve existing valid positive labels for `acting_hand_not_visible` and
+`low_hand_activity`. Outputs preserve source group/split identity and mask
+every target that the transformation or inherited annotation does not
+establish.
 
 The optional [public-corpus adapter](PUBLIC_CORPUS.md) follows this rule
 literally. Ego-Tactile contact/grip-force action spans are emitted with
 `label_source.kind: "proxy"` and `human_reviewed: false`. They provide proxy
 boundary targets only: readiness remains invalid and all issue targets remain
 unknown. In particular, a source value such as `annotation.hand: "none"` is
-not silently converted into an EgoSieve `no_hands` label.
+not silently converted into an EgoSieve `acting_hand_not_visible` label.
 
 The HoloAssist adapter emits fixed-window readiness proxies from the temporal
 union of independently audited publisher fine-action intervals. It records
@@ -67,12 +69,26 @@ fine-action occupancy are derived REJECT proxies, not human background labels.
 No HoloAssist window receives a technical-issue target. Records use
 `source: "HoloAssist"` and group by original video.
 
-The v1 issue vocabulary is fixed to `no_hands`, `low_hand_activity`,
-`hand_occlusion`, `camera_instability`, `blur`, `exposure`, `scene_cut`, and
-`duplicate_frames`. The parser rejects any other issue or validity-mask key so
+The v1 issue vocabulary is fixed to `acting_hand_not_visible`,
+`low_hand_activity`, `camera_instability`, `blur`, `exposure`, `scene_cut`,
+and `duplicate_frames`. The parser rejects any other issue or validity-mask key so
 a spelling mistake cannot be silently dropped during vectorization. A dataset
 with a deliberately different vocabulary must pass that vocabulary explicitly
 as `issue_names` to both parsing and target building.
+
+### Visibility-label migration
+
+Development annotations using separate `no_hands` and `hand_occlusion` fields
+must be migrated before parsing. A valid positive from either old field may
+support a positive `acting_hand_not_visible` label only when it refers to the
+task-relevant acting hand. A negative is established only when both old fields
+were valid negatives; otherwise the new target remains unknown. Conflicts and
+ambiguous references require review.
+
+The classifier changed from eight issue logits to seven and the public order
+changed. Earlier seed checkpoints and trained checkpoints are shape- and
+semantics-incompatible: regenerate the training seed and retrain rather than
+renaming configuration metadata or reusing classifier rows.
 
 ## Sampled-frame boundary targets
 

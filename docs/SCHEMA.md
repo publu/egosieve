@@ -68,7 +68,7 @@ seconds on the decoded presentation timeline, not frame numbers.
   "score": 0.91,
   "uncertainty": 0.24,
   "routing_uncertainty": 0.24,
-  "issues": {"hand_occlusion": 0.31, "blur": 0.04},
+  "issues": {"acting_hand_not_visible": 0.31, "blur": 0.04},
   "reported_issues": [],
   "boundary": [
     {"timestamp_s": 12.25, "start": 0.83, "end": 0.04}
@@ -107,7 +107,7 @@ calibration and conflict-resolution policy is evaluated and versioned.
   "window_indices": [6, 7, 8, 9],
   "mean_score": 0.89,
   "readiness": {"KEEP": 0.89, "REVIEW": 0.08, "REJECT": 0.03},
-  "issues": {"hand_occlusion": 0.31},
+  "issues": {"acting_hand_not_visible": 0.31},
   "reported_issues": []
 }
 ```

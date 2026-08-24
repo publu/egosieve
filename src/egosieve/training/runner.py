@@ -44,6 +44,7 @@ RELEASE_PROVENANCE_KINDS = (
     "unlabeled",
 )
 HUMAN_GROUNDED_PROVENANCE = frozenset({"human", "human-derived"})
+READINESS_EVIDENCE_PROVENANCE = ("human", "human-derived")
 ISSUE_EVIDENCE_PROVENANCE = (
     "human",
     "human-derived",
@@ -498,6 +499,7 @@ def _release_evaluation_provenance(
     readiness_count = 0
     issue_count = 0
     boundary_count = 0
+    readiness_counts = {kind: 0 for kind in READINESS_EVIDENCE_PROVENANCE}
     issue_counts = {kind: 0 for kind in ISSUE_EVIDENCE_PROVENANCE}
     readiness_human_grounded = True
 
@@ -513,7 +515,9 @@ def _release_evaluation_provenance(
         )
         if readiness_valid:
             readiness_count += 1
-            readiness_human_grounded &= provenance["readiness"]["kind"] in HUMAN_GROUNDED_PROVENANCE
+            readiness_kind = provenance["readiness"]["kind"]
+            readiness_human_grounded &= readiness_kind in HUMAN_GROUNDED_PROVENANCE
+            readiness_counts[readiness_kind] += 1
         if any(issue_valid):
             issue_count += 1
             issue_counts[provenance["issues"]["kind"]] += 1
@@ -532,6 +536,7 @@ def _release_evaluation_provenance(
         "issues_controlled_corruptions": True,
         "test_examples": len(examples),
         "readiness_examples": readiness_count,
+        "readiness_examples_by_provenance": readiness_counts,
         "issue_examples": issue_count,
         "boundary_examples": boundary_count,
         "issue_examples_by_provenance": issue_counts,
@@ -717,24 +722,50 @@ def _render_model_card(
 ) -> str:
     datasets = ", ".join(f"{row['name']} ({row['license']})" for row in metrics["data"]["datasets"])
     evaluation = metrics["evaluation"]
+    readiness_provenance = evaluation["readiness_examples_by_provenance"]
     issue_provenance = evaluation["issue_examples_by_provenance"]
     return f"""---
 license: apache-2.0
 library_name: transformers
 pipeline_tag: video-classification
 base_model: {backbone}
+datasets:
+  - itspublu/EgoSieve-Eval
 tags:
   - robotics
   - egocentric-video
   - video-quality
   - dataset-curation
   - physical-ai
+model-index:
+  - name: EgoSieve-S
+    results:
+      - task:
+          type: video-classification
+          name: Egocentric video readiness
+        dataset:
+          type: itspublu/EgoSieve-Eval
+          name: EgoSieve-Eval
+          split: test
+        metrics:
+          - type: f1
+            name: Readiness macro F1
+            value: {metrics["readiness"]["macro_f1"]:.8f}
+          - type: roc_auc
+            name: Issue macro AUROC
+            value: {metrics["issues"]["macro_auroc"]:.8f}
+          - type: average_precision
+            name: Issue macro average precision
+            value: {metrics["issues"]["macro_average_precision"]:.8f}
+          - type: f1
+            name: Boundary micro F1
+            value: {metrics["boundaries"]["f1"]:.8f}
 ---
 
 # EgoSieve-S
 
 EgoSieve-S ranks manipulation-ready spans in first-person video. It produces
-three readiness logits (`KEEP`, `REVIEW`, `REJECT`), eight observable issue
+three readiness logits (`KEEP`, `REVIEW`, `REJECT`), seven observable issue
 scores, diagnostic start/end boundary proposals, and a normalized retrieval
 embedding. It is a dataset-curation model, not a robot policy.
 
@@ -760,7 +791,9 @@ RGB frames per window; use its bundled processor.
 
 Data represented in the held-out evaluation: {datasets}. Splits are grouped by
 original capture unit. Readiness, calibration, and boundary results use
-{evaluation["readiness_examples"]} human-grounded readiness rows and
+{evaluation["readiness_examples"]} human-grounded readiness rows:
+{readiness_provenance["human"]} direct human and
+{readiness_provenance["human-derived"]} human-derived. Boundary results use
 {evaluation["boundary_examples"]} human-grounded boundary rows. Issue results
 use {evaluation["issue_examples"]} labeled rows: {issue_provenance["human"]}
 human, {issue_provenance["human-derived"]} human-derived, and
@@ -768,6 +801,17 @@ human, {issue_provenance["human-derived"]} human-derived, and
 controlled corruptions. Unlabeled task targets are masked. The release bundle
 includes raw held-out predictions with task-level provenance, split
 assignments, exact run configuration, and metric provenance.
+
+Human-derived rows are not direct, independent EgoSieve rubric judgments. Treat
+them as proxy evidence and consult the source dataset cards and their
+dataset-specific proxy details before comparing or interpreting these metrics.
+
+For v0.1, readiness and boundaries come from a fixed-grid occupancy rule over
+reviewed HoloAssist fine-action intervals. `low_hand_activity` is an occupancy
+proxy, and `acting_hand_not_visible` follows HoloAssist's acting-hand modifier;
+it does not assert that every hand is absent. The other five issue metrics
+measure injected-corruption versus unmodified-reference discrimination. Those
+references were not independently audited as natural issue negatives.
 
 - Readiness macro F1: {metrics["readiness"]["macro_f1"]:.4f}
 - Issue macro AUROC: {metrics["issues"]["macro_auroc"]:.4f}

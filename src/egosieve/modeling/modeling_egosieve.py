@@ -22,7 +22,7 @@ class EgoSieveModelOutput(ModelOutput):
         logits: Standard Hugging Face video-classification logits in
             ``KEEP, REVIEW, REJECT`` order, with shape ``[batch, 3]``.
         issue_logits: Clip-level multi-label logits in
-            :data:`egosieve.ISSUE_LABELS` order, with shape ``[batch, 8]``.
+            :data:`egosieve.ISSUE_LABELS` order, with shape ``[batch, 7]``.
         boundary_logits: Per-frame ``start, end`` logits with shape
             ``[batch, frames, 2]``. Masked-frame entries are zero.
         clip_embedding: L2-normalized clip representation with shape

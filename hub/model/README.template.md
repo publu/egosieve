@@ -30,9 +30,14 @@ used to control hardware.
   mask. The bundled processor handles normalization; timestamp-based video
   sampling is provided by the EgoSieve package.
 - **Readiness classes:** `KEEP`, `REVIEW`, `REJECT`.
-- **Issue labels:** `no_hands`, `low_hand_activity`, `hand_occlusion`,
+- **Issue labels:** `acting_hand_not_visible`, `low_hand_activity`,
   `camera_instability`, `blur`, `exposure`, `scene_cut`, `duplicate_frames`.
 - **License:** Apache 2.0. The base encoder is also Apache 2.0.
+
+The seven-head issue contract is incompatible with earlier eight-head
+development checkpoints. Seed artifacts must be regenerated and the issue
+classifier retrained; relabeling an old configuration does not migrate its
+weights.
 
 ## Usage
 
@@ -77,6 +82,10 @@ audited human annotations with programmatic controlled corruptions, with counts
 reported separately by provenance. Boundary F1 uses the temporal tolerance
 stated in the evaluation artifact. Calibration is reported because `REVIEW`
 routing depends on confidence, not just top-1 accuracy.
+
+Human-derived rows are not direct, independent EgoSieve rubric judgments. Treat
+them as proxy evidence and consult each source dataset card's dataset-specific
+proxy details before interpreting or comparing these metrics.
 
 ## Intended use
 

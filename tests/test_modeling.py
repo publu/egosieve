@@ -55,7 +55,7 @@ def test_pixel_forward_shapes_and_label_contract() -> None:
     assert output.logits.shape == (2, 3)
     assert output.readiness_logits is output.logits
     assert output.readiness_logits.shape == (2, 3)
-    assert output.issue_logits.shape == (2, 8)
+    assert output.issue_logits.shape == (2, 7)
     assert output.boundary_logits.shape == (2, 4, 2)
     assert output.clip_embedding.shape == (2, 12)
     torch.testing.assert_close(output.clip_embedding.norm(dim=-1), torch.ones(2))
@@ -63,15 +63,39 @@ def test_pixel_forward_shapes_and_label_contract() -> None:
     assert tuple(config.readiness_labels) == READINESS_LABELS
     assert tuple(config.issue_labels) == ISSUE_LABELS
     assert ISSUE_LABELS == (
-        "no_hands",
+        "acting_hand_not_visible",
         "low_hand_activity",
-        "hand_occlusion",
         "camera_instability",
         "blur",
         "exposure",
         "scene_cut",
         "duplicate_frames",
     )
+
+
+@pytest.mark.parametrize(
+    "legacy_metadata",
+    [
+        {
+            "issue_labels": [
+                "no_hands",
+                "low_hand_activity",
+                "hand_occlusion",
+                "camera_instability",
+                "blur",
+                "exposure",
+                "scene_cut",
+                "duplicate_frames",
+            ]
+        },
+        {"num_issue_labels": 8},
+    ],
+)
+def test_legacy_eight_issue_checkpoint_metadata_is_rejected(
+    legacy_metadata: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="regenerate the seed checkpoint and retrain"):
+        tiny_config(**legacy_metadata)
 
 
 def test_masked_pixels_cannot_change_any_output() -> None:
@@ -106,7 +130,7 @@ def test_multitask_loss_supports_ignore_values_and_masks() -> None:
     embeddings = torch.randn(2, 4, config.vision_config.hidden_size)
     frame_mask = torch.tensor([[1, 1, 1, 1], [1, 1, 0, 0]], dtype=torch.bool)
     readiness_labels = torch.tensor([2, -100])
-    issue_labels = torch.randint(0, 2, (2, 8), dtype=torch.float32)
+    issue_labels = torch.randint(0, 2, (2, len(ISSUE_LABELS)), dtype=torch.float32)
     issue_labels[0, 1] = float("nan")
     issue_labels[1, 3] = -100
     issue_label_mask = torch.tensor([1, 0], dtype=torch.bool)
@@ -136,7 +160,7 @@ def test_multitask_loss_supports_ignore_values_and_masks() -> None:
     ignored = model(
         frame_embeddings=embeddings,
         readiness_labels=torch.full((2,), -100),
-        issue_labels=torch.full((2, 8), -100.0),
+        issue_labels=torch.full((2, len(ISSUE_LABELS)), -100.0),
         boundary_labels=torch.full((2, 4, 2), -100.0),
     )
     assert ignored.loss is not None

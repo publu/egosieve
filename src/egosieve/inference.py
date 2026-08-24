@@ -231,6 +231,26 @@ def _validate_frame_contract(
         )
 
 
+def _validate_issue_contract(model: Any) -> None:
+    """Reject checkpoints whose issue heads cannot be interpreted safely."""
+
+    model_config = getattr(model, "config", None)
+    declared_labels = getattr(model_config, "issue_labels", None)
+    if declared_labels is None:
+        raise ValueError("issue-label contract is incomplete; missing model.config.issue_labels")
+    if tuple(declared_labels) != ISSUE_LABELS:
+        raise ValueError(
+            "issue-label contract mismatch: model.config.issue_labels must exactly match "
+            f"{list(ISSUE_LABELS)!r}"
+        )
+    declared_width = getattr(model_config, "num_issue_labels", None)
+    if declared_width != len(ISSUE_LABELS):
+        raise ValueError(
+            "issue-label contract mismatch: model.config.num_issue_labels must equal "
+            f"{len(ISSUE_LABELS)}"
+        )
+
+
 def predict_prepared_video(
     prepared: PreparedVideo,
     *,
@@ -246,6 +266,7 @@ def predict_prepared_video(
         processor=processor,
         plan=prepared.plan,
     )
+    _validate_issue_contract(model)
     device = _device(config.device)
     model = model.to(device).eval()
     frame_windows = prepared.frame_paths_by_window()
@@ -332,7 +353,16 @@ def predict_prepared_video(
                     else 1.0
                 )
             readiness = torch.softmax(logits.float() / temperature, dim=-1).cpu()
-            issues = torch.sigmoid(output.issue_logits.float()).cpu()
+            issue_logits = getattr(output, "issue_logits", None)
+            if issue_logits is None:
+                raise ValueError("model output must provide issue_logits")
+            expected_issue_shape = (readiness.shape[0], len(ISSUE_LABELS))
+            if tuple(issue_logits.shape) != expected_issue_shape:
+                raise ValueError(
+                    "model output issue_logits shape mismatch: expected "
+                    f"{expected_issue_shape}, received {tuple(issue_logits.shape)}"
+                )
+            issues = torch.sigmoid(issue_logits.float()).cpu()
             boundaries = torch.sigmoid(output.boundary_logits.float()).cpu()
             embeddings = output.clip_embedding.float().cpu()
             uncertainties = _entropy(readiness)

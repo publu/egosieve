@@ -13,9 +13,8 @@ from transformers import Dinov2Config, PretrainedConfig
 # would silently reinterpret existing classifier weights.
 READINESS_LABELS = ("KEEP", "REVIEW", "REJECT")
 ISSUE_LABELS = (
-    "no_hands",
+    "acting_hand_not_visible",
     "low_hand_activity",
-    "hand_occlusion",
     "camera_instability",
     "blur",
     "exposure",
@@ -78,6 +77,21 @@ class EgoSieveConfig(PretrainedConfig):
         ignore_index: int = -100,
         **kwargs: Any,
     ) -> None:
+        serialized_issue_labels = kwargs.pop("issue_labels", None)
+        serialized_num_issue_labels = kwargs.pop("num_issue_labels", None)
+        if serialized_issue_labels is not None and tuple(serialized_issue_labels) != ISSUE_LABELS:
+            raise ValueError(
+                "checkpoint config uses an incompatible issue-label vocabulary; "
+                "regenerate the seed checkpoint and retrain for the current seven-label contract"
+            )
+        if serialized_num_issue_labels is not None and serialized_num_issue_labels != len(
+            ISSUE_LABELS
+        ):
+            raise ValueError(
+                "checkpoint config uses an incompatible issue-head width; "
+                "regenerate the seed checkpoint and retrain for the current seven-label contract"
+            )
+
         id2label = {index: label for index, label in enumerate(READINESS_LABELS)}
         label2id = {label: index for index, label in enumerate(READINESS_LABELS)}
         # These mappings are fixed because they describe the three readiness

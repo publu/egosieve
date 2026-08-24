@@ -35,7 +35,7 @@ class FakeProcessor:
 class FakeOutput:
     def __init__(self, batch: int, frames: int):
         self.logits = torch.tensor([[4.0, 0.0, -2.0]]).repeat(batch, 1)
-        self.issue_logits = torch.tensor([[-4.0, -3.0, 1.0, -4.0, -4.0, -4.0, -4.0, -4.0]]).repeat(
+        self.issue_logits = torch.tensor([[1.0, -4.0, -4.0, -4.0, -4.0, -4.0, -4.0]]).repeat(
             batch, 1
         )
         self.boundary_logits = torch.zeros(batch, frames, 2)
@@ -43,7 +43,21 @@ class FakeOutput:
 
 
 class FakeModel:
-    config = SimpleNamespace(num_frames=2, max_frames=8, _commit_hash=None)
+    config = SimpleNamespace(
+        num_frames=2,
+        max_frames=8,
+        issue_labels=[
+            "acting_hand_not_visible",
+            "low_hand_activity",
+            "camera_instability",
+            "blur",
+            "exposure",
+            "scene_cut",
+            "duplicate_frames",
+        ],
+        num_issue_labels=7,
+        _commit_hash=None,
+    )
 
     def to(self, _device):
         return self
@@ -96,7 +110,7 @@ def test_predictions_and_rich_manifest(tmp_path) -> None:
     )
     assert len(predictions) == 2
     assert predictions[0].decision == "KEEP"
-    assert predictions[0].issues["hand_occlusion"] > 0.5
+    assert predictions[0].issues["acting_hand_not_visible"] > 0.5
     assert len(predictions[0].embedding) == 4
 
     compilation = VideoCompiler(config.compiler).compile(
@@ -120,7 +134,7 @@ def test_predictions_and_rich_manifest(tmp_path) -> None:
     }
     window = next(record for record in records if record["record_type"] == "window")
     assert window["decision"] == "KEEP"
-    assert window["reported_issues"] == ["hand_occlusion"]
+    assert window["reported_issues"] == ["acting_hand_not_visible"]
     segment = next(record for record in records if record["record_type"] == "segment")
     assert segment["segment_id"].startswith("sha256:")
 
@@ -171,6 +185,53 @@ def test_prepared_inference_requires_declared_frame_contract(tmp_path) -> None:
             _prepared(tmp_path),
             model=FakeModel(),
             processor=object(),
+            config=ScanConfig(frames_per_window=2, device="cpu"),
+        )
+
+
+def test_prepared_inference_rejects_legacy_issue_label_contract(tmp_path) -> None:
+    model = FakeModel()
+    model.config = SimpleNamespace(
+        num_frames=2,
+        max_frames=8,
+        issue_labels=[
+            "no_hands",
+            "low_hand_activity",
+            "hand_occlusion",
+            "camera_instability",
+            "blur",
+            "exposure",
+            "scene_cut",
+            "duplicate_frames",
+        ],
+        num_issue_labels=8,
+    )
+
+    with pytest.raises(ValueError, match="issue-label contract mismatch"):
+        predict_prepared_video(
+            _prepared(tmp_path),
+            model=model,
+            processor=FakeProcessor(),
+            config=ScanConfig(
+                frames_per_window=2,
+                device="cpu",
+                use_checkpoint_calibration=False,
+            ),
+        )
+
+
+def test_prepared_inference_rejects_wrong_issue_output_width(tmp_path) -> None:
+    class WideIssueModel(FakeModel):
+        def __call__(self, pixel_values, frame_mask):
+            output = super().__call__(pixel_values, frame_mask)
+            output.issue_logits = torch.zeros(pixel_values.shape[0], 8)
+            return output
+
+    with pytest.raises(ValueError, match="issue_logits shape mismatch"):
+        predict_prepared_video(
+            _prepared(tmp_path),
+            model=WideIssueModel(),
+            processor=FakeProcessor(),
             config=ScanConfig(frames_per_window=2, device="cpu"),
         )
 

@@ -90,15 +90,15 @@ print(result.manifest_path)
 | `camera_instability` | `camera_instability` | Time-varying translated crop |
 | `freeze` | `duplicate_frames` | A fixed frame replaces a contiguous interval |
 | `scene_cut` | `scene_cut` | A hard temporal splice removes a middle interval from the same source window |
-| `hand_occlusion` | `hand_occlusion` | An opaque overlay covers the union of declared hand boxes |
-| `no_hands` | `no_hands` | Faithful re-encode, only when the source window already has a valid positive `no_hands` label |
+| `hand_occlusion` | `acting_hand_not_visible` | An opaque overlay covers the union of declared acting-hand boxes |
+| `acting_hand_not_visible` | `acting_hand_not_visible` | Faithful re-encode, only when the source window already has a valid positive `acting_hand_not_visible` label |
 | `low_hand_activity` | `low_hand_activity` | Faithful re-encode, only when the source window already has a valid positive `low_hand_activity` label |
 
 The first six rows are controlled proxies for observable failure modes, not
 substitutes for naturally occurring examples. In particular, translated crops
 do not cover every form of camera instability, and a same-source temporal
-splice is only one kind of edit discontinuity. `no_hands` and
-`low_hand_activity` are never manufactured: an ineligible source window is
+splice is only one kind of edit discontinuity. `acting_hand_not_visible` and
+`low_hand_activity` are never manufactured by their faithful transforms: an ineligible source window is
 written to `skipped.jsonl` with `source_positive_required`. Even a valid
 positive is skipped with `human_issue_provenance_required` unless
 `label_provenance.issues.kind` explicitly says `human` or `human-derived`.
@@ -128,7 +128,7 @@ windows use:
 }
 ```
 
-Faithful `no_hands` and `low_hand_activity` outputs use
+Faithful `acting_hand_not_visible` and `low_hand_activity` outputs use
 `label_provenance.issues.kind: human-derived`, while recording whether their
 source issue evidence was `human` or `human-derived`. They are not generated
 from legacy, unlabeled, or programmatic issue provenance. A source readiness
@@ -165,7 +165,7 @@ derived-corpus/
     freeze/*.mp4
     scene_cut/*.mp4
     hand_occlusion/*.mp4
-    no_hands/*.mp4
+    acting_hand_not_visible/*.mp4
     low_hand_activity/*.mp4
 ```
 

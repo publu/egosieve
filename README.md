@@ -97,7 +97,7 @@ complete.
 
 ```json
 {"record_type":"manifest","schema":"egosieve.video-compilation","schema_version":1,"source":{"source_sha256":"…","duration_s":91.42},"model":{"id":"itspublu/EgoSieve-S","revision":"…"}}
-{"record_type":"segment","schema_version":1,"start_s":12.4,"end_s":19.1,"route":"keep","decision":"KEEP","readiness":{"KEEP":0.91,"REVIEW":0.07,"REJECT":0.02},"issues":{"hand_occlusion":0.31}}
+{"record_type":"segment","schema_version":1,"start_s":12.4,"end_s":19.1,"route":"keep","decision":"KEEP","readiness":{"KEEP":0.91,"REVIEW":0.07,"REJECT":0.02},"issues":{"acting_hand_not_visible":0.31}}
 ```
 
 Times live on the decoded presentation timeline. Variable-frame-rate sources

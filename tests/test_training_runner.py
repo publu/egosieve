@@ -292,11 +292,17 @@ def test_tiny_feature_cached_training_builds_evidence(tmp_path: Path) -> None:
             }
         },
         "readiness_examples": 3,
+        "readiness_examples_by_provenance": {
+            "human": 2,
+            "human-derived": 1,
+        },
         "readiness_human_grounded": True,
         "test_examples": 4,
     }
     card = (output / "README.md").read_text()
     assert "task-level provenance" in card
+    assert "Human-derived rows are not direct, independent EgoSieve rubric judgments" in card
+    assert "dataset-specific proxy details" in card
     assert "human-reviewed" not in card
     trained = EgoSieveModel.from_pretrained(output, local_files_only=True)
     assert not torch.equal(
@@ -335,9 +341,9 @@ def test_release_prediction_export_rejects_flat_provenance(tmp_path: Path) -> No
         "readiness_valid": [True],
         "readiness_labels": [0],
         "readiness_probabilities": [[0.8, 0.1, 0.1]],
-        "issue_valid": [[False] * 4 + [True] + [False] * 3],
-        "issue_labels": [[0.0] * 4 + [1.0] + [0.0] * 3],
-        "issue_probabilities": [[0.1] * 4 + [0.9] + [0.1] * 3],
+        "issue_valid": [[label == "blur" for label in ISSUE_LABELS]],
+        "issue_labels": [[1.0 if label == "blur" else 0.0 for label in ISSUE_LABELS]],
+        "issue_probabilities": [[0.9 if label == "blur" else 0.1 for label in ISSUE_LABELS]],
         "boundary_reference_s": [[0.1, 0.9]],
         "boundary_reference_valid": [[True, True]],
         "boundary_prediction_s": [[0.1, 0.9]],

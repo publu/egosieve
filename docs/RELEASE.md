@@ -54,7 +54,7 @@ row carries:
   `boundaries` kinds;
 - `readiness_valid`, a nullable readiness target, and three probabilities
   summing to one;
-- eight issue targets, validity flags, and probabilities;
+- seven issue targets, validity flags, and probabilities;
 - start/end reference and predicted timestamps with independent validity
   flags.
 
@@ -106,12 +106,18 @@ recomputes:
 - start/end boundary matching and micro F1 at the declared tolerance;
 - top-label ECE using the declared bin count and the complete selective-risk
   curve, using only rows where `readiness_valid` is true;
-- total, readiness, issue, and boundary evidence-row counts;
+- total, readiness, issue, and boundary evidence-row counts, including exact
+  direct-human versus human-derived readiness counts;
 - readiness macro F1 by source, using only valid readiness rows and omitting
   issue-only sources.
 
 `metrics.evaluation` declares `readiness_human_grounded: true` and
 `issues_controlled_corruptions: true`, and its
+`readiness_examples_by_provenance` object reports `human` and `human-derived`
+readiness-row counts. Those counts must sum to `readiness_examples` and are
+recomputed from raw row provenance. `human-derived` rows are proxy evidence,
+not direct, independent EgoSieve rubric judgments; the model card must point to
+the source dataset's dataset-specific proxy details. Its
 `issue_examples_by_provenance` object reports row counts for `human`,
 `human-derived`, and `programmatic-controlled-corruption` issue evidence. The
 former blanket `human_reviewed` field is rejected because it mischaracterizes

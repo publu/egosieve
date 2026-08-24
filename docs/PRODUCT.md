@@ -30,9 +30,9 @@ RGB and it does not replace a pose tracker, labeler, or policy.
 Given an MP4, MOV, or MKV, a checkpoint produces:
 
 1. `KEEP`, `REVIEW`, or `REJECT` probabilities for each time window.
-2. Independent probabilities for eight observable issue families:
-   `no_hands`, `low_hand_activity`, `hand_occlusion`, `camera_instability`,
-   `blur`, `exposure`, `scene_cut`, and `duplicate_frames`.
+2. Independent probabilities for seven observable issue families:
+   `acting_hand_not_visible`, `low_hand_activity`, `camera_instability`, `blur`,
+   `exposure`, `scene_cut`, and `duplicate_frames`.
 3. Start/end boundary probabilities for interaction-aware segmentation.
 4. A normalized clip embedding for deduplication, clustering, and retrieval.
 5. An uncertainty score and the evidence needed to reproduce the decision.

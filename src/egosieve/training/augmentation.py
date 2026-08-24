@@ -1,10 +1,12 @@
 """Deterministic, license-preserving observable-issue corpus construction.
 
-The builder emits six positive programmatic corruptions. ``no_hands`` and
-``low_hand_activity`` are never synthesized; they require a valid positive
-source label and use a faithful window re-encode. Every derived window
-activates exactly one issue target; readiness, temporal boundaries, and every
-other issue remain masked. This is a deliberate safety property: an
+The builder emits six positive programmatic corruptions. An explicit
+``hand_occlusion`` overlay creates controlled positive evidence for
+``acting_hand_not_visible``. Faithful transforms with the public issue names
+also preserve valid positive source labels for ``acting_hand_not_visible`` and
+``low_hand_activity`` without manufacturing new visual evidence. Every derived
+window activates exactly one issue target; readiness, temporal boundaries, and
+every other issue remain masked. This is a deliberate safety property: an
 unmentioned issue in a source annotation is unknown, never a negative example.
 """
 
@@ -46,15 +48,15 @@ TRANSFORM_TO_ISSUE: dict[str, str] = {
     "camera_instability": "camera_instability",
     "freeze": "duplicate_frames",
     "scene_cut": "scene_cut",
-    "hand_occlusion": "hand_occlusion",
-    "no_hands": "no_hands",
+    "hand_occlusion": "acting_hand_not_visible",
+    "acting_hand_not_visible": "acting_hand_not_visible",
     "low_hand_activity": "low_hand_activity",
 }
 TRANSFORM_NAMES = tuple(TRANSFORM_TO_ISSUE)
 PROGRAMMATIC_TRANSFORMS = tuple(
-    name for name in TRANSFORM_NAMES if name not in {"no_hands", "low_hand_activity"}
+    name for name in TRANSFORM_NAMES if name not in {"acting_hand_not_visible", "low_hand_activity"}
 )
-SOURCE_INHERITED_TRANSFORMS = ("no_hands", "low_hand_activity")
+SOURCE_INHERITED_TRANSFORMS = ("acting_hand_not_visible", "low_hand_activity")
 CONTROLLED_CORRUPTION_KIND = "programmatic-controlled-corruption"
 HUMAN_DERIVED_KIND = "human-derived"
 HUMAN_GROUNDED_KINDS = frozenset({"human", HUMAN_DERIVED_KIND})
@@ -462,7 +464,8 @@ def _hand_union(window: TrainingWindow, margin: float) -> tuple[float, float, fl
 
     The optional source field is ``hand_regions``: a list of ``[x, y, w, h]``
     boxes normalized to coded-frame width and height.  We deliberately refuse
-    to synthesize ``hand_occlusion`` without these spatial annotations.
+    to synthesize the ``acting_hand_not_visible`` target with the
+    ``hand_occlusion`` transform without these spatial annotations.
     """
 
     raw = window.extra.get("hand_regions")
@@ -1189,7 +1192,7 @@ def build_augmented_corpus(
             "programmatic_readiness_valid": False,
             "source_human_readiness_inherited_when_valid": True,
             "boundary_valid": False,
-            "hand_occlusion_requires": "normalized coded-frame hand_regions",
+            "hand_occlusion_transform_requires": "normalized coded-frame hand_regions",
             "source_inherited_issues": list(SOURCE_INHERITED_TRANSFORMS),
             "source_inherited_requires": (
                 "an existing valid positive source label with explicit human or "

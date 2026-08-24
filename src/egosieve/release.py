@@ -70,6 +70,7 @@ PROVENANCE_KINDS = (
     "unlabeled",
 )
 HUMAN_GROUNDED_PROVENANCE = frozenset({"human", "human-derived"})
+READINESS_EVIDENCE_PROVENANCE = ("human", "human-derived")
 ISSUE_EVIDENCE_PROVENANCE = (
     "human",
     "human-derived",
@@ -400,6 +401,7 @@ def _validate_predictions(
     boundary_reference_valid: list[list[bool]] = []
     boundary_prediction_valid: list[list[bool]] = []
     sources: list[str] = []
+    readiness_provenance_kinds: list[str] = []
     issue_provenance_kinds: list[str] = []
 
     for index, value in enumerate(examples):
@@ -470,6 +472,7 @@ def _validate_predictions(
                 )
             readiness_targets.append(-100)
         readiness_valid.append(readiness_is_valid)
+        readiness_provenance_kinds.append(readiness_provenance)
         readiness_probabilities.append(
             _probability_vector(
                 value.get("readiness_probabilities"),
@@ -583,6 +586,11 @@ def _validate_predictions(
             )
 
     issue_row_valid = np.any(issue_valid_array, axis=1)
+    readiness_provenance_array = np.asarray(readiness_provenance_kinds, dtype=object)
+    readiness_examples_by_provenance = {
+        kind: int(np.count_nonzero(readiness_valid_array & (readiness_provenance_array == kind)))
+        for kind in READINESS_EVIDENCE_PROVENANCE
+    }
     issue_provenance_array = np.asarray(issue_provenance_kinds, dtype=object)
     issue_examples_by_provenance = {
         kind: int(np.count_nonzero(issue_row_valid & (issue_provenance_array == kind)))
@@ -610,6 +618,7 @@ def _validate_predictions(
         "boundary_prediction_valid": np.asarray(boundary_prediction_valid, dtype=bool),
         "sources": np.asarray(sources, dtype=object),
         "readiness_human_grounded": bool(np.any(readiness_valid_array)),
+        "readiness_examples_by_provenance": readiness_examples_by_provenance,
         "issues_controlled_corruptions": issues_controlled_corruptions,
         "issue_examples_by_provenance": issue_examples_by_provenance,
     }
@@ -717,6 +726,18 @@ def _validate_metrics(metrics: dict[str, Any]) -> None:
         )
     if evaluation.get("readiness_human_grounded") is not True:
         raise ReleaseValidationError("evaluation.readiness_human_grounded must be true")
+    readiness_provenance_counts = evaluation.get("readiness_examples_by_provenance")
+    if not isinstance(readiness_provenance_counts, dict) or set(readiness_provenance_counts) != set(
+        READINESS_EVIDENCE_PROVENANCE
+    ):
+        raise ReleaseValidationError(
+            "evaluation.readiness_examples_by_provenance must report human and human-derived"
+        )
+    for kind in READINESS_EVIDENCE_PROVENANCE:
+        _non_negative_integer(
+            readiness_provenance_counts[kind],
+            f"evaluation.readiness_examples_by_provenance.{kind}",
+        )
     if evaluation.get("issues_controlled_corruptions") is not True:
         raise ReleaseValidationError("evaluation.issues_controlled_corruptions must be true")
     issue_provenance_counts = evaluation.get("issue_examples_by_provenance")
@@ -770,6 +791,10 @@ def _validate_metrics(metrics: dict[str, Any]) -> None:
     if sum(issue_provenance_counts.values()) != evaluation_counts["issue_examples"]:
         raise ReleaseValidationError(
             "evaluation.issue_examples must equal issue_examples_by_provenance"
+        )
+    if sum(readiness_provenance_counts.values()) != evaluation_counts["readiness_examples"]:
+        raise ReleaseValidationError(
+            "evaluation.readiness_examples must equal readiness_examples_by_provenance"
         )
 
     datasets = metrics.get("data", {}).get("datasets")
@@ -934,6 +959,12 @@ def _recompute_and_validate_metrics(metrics: dict[str, Any], predictions: dict[s
             raise ReleaseValidationError(
                 f"evaluation.{name} does not match test_predictions label provenance"
             )
+    for kind in READINESS_EVIDENCE_PROVENANCE:
+        _expect_integer(
+            evaluation["readiness_examples_by_provenance"][kind],
+            predictions["readiness_examples_by_provenance"][kind],
+            f"evaluation.readiness_examples_by_provenance.{kind}",
+        )
     for kind in ISSUE_EVIDENCE_PROVENANCE:
         _expect_integer(
             evaluation["issue_examples_by_provenance"][kind],
@@ -1014,7 +1045,7 @@ def _validate_runtime(root: Path, config: dict[str, Any], processor_config: dict
     expected_shapes = {
         "logits": (1, 3),
         "readiness_logits": (1, 3),
-        "issue_logits": (1, 8),
+        "issue_logits": (1, len(ISSUE_LABELS)),
         "boundary_logits": (1, num_frames, 2),
     }
     for name, shape in expected_shapes.items():
@@ -1028,6 +1059,8 @@ def _validate_runtime(root: Path, config: dict[str, Any], processor_config: dict
         raise ReleaseValidationError("forward output `clip_embedding` has an invalid shape")
     if config.get("readiness_labels") != ["KEEP", "REVIEW", "REJECT"]:
         raise ReleaseValidationError("config readiness label order is invalid")
+    if config.get("issue_labels") != list(ISSUE_LABELS):
+        raise ReleaseValidationError("config issue label order is invalid")
 
 
 def validate_release(directory: str | Path) -> dict[str, Any]:
